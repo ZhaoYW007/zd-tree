@@ -26,9 +26,9 @@
 #include "common/geometry.h"
 #include "common/geometryIO.h"
 #include "common/parse_command_line.h"
-#include "common/time_loop.h"
 #include "parlay/parallel.h"
 #include "parlay/primitives.h"
+#include "parlay/random.h"
 using namespace benchIO;
 
 // *************************************************************
@@ -65,8 +65,8 @@ timeNeighbors( parlay::sequence<point>& pts, int k, int rounds, char* outFile )
    auto vv = parlay::tabulate(
        n, [&]( size_t i ) -> vtx { return vtx( pts[i], i ); } );
    auto v = parlay::tabulate( n, [&]( size_t i ) -> vtx* { return &vv[i]; } );
-
    ANN<maxK>( v, k );
+
    if( outFile != NULL )
    {
       int m = n * k;
@@ -103,7 +103,7 @@ main( int argc, char* argv[] )
                   "[-p <inFile>] [-t <tag>]" );
    char* iFile = P.getOptionValue( "-p" );
    char* oFile = P.getOptionValue( "-o" );
-   int rounds = P.getOptionIntValue( "-r", 1 );
+   int rounds = P.getOptionIntValue( "-r", 3 );
    int k = P.getOptionIntValue( "-k", 1 );
    int d = P.getOptionIntValue( "-d", 3 );
    int tag = P.getOptionIntValue( "-t", -1 );

@@ -30,9 +30,11 @@ int algorithm_version = 0;
 #include <queue>
 
 #include "common/geometry.h"
+#include "common/time_loop.h"
 #include "k_nearest_neighbors.h"
 #include "parlay/parallel.h"
 #include "parlay/primitives.h"
+#include "parlay/random.h"
 
 // find the k nearest neighbors for all points in tree
 // places pointers to them in the .ngh field of each vertex
@@ -70,8 +72,10 @@ ANN( parlay::sequence<vtx*>& v, int k )
 
       // build tree with optional box
       knn_tree T( v, whole_box );
-      _t.stop();
-      std::cout << _t.total_time << " " << std::flush;
+      double aveBuild = time_loop(
+          3, 1.0, [&]() { parlay::random_shuffle( v.cut( 0, size ) ); },
+          [&]() { T = knn_tree( v, whole_box ); }, [&]() { T.tree.reset(); } );
+      std::cout << aveBuild << " " << std::flush;
 
       // prelims for insert/delete
       int dims = v[0]->pt.dimension();
@@ -89,49 +93,53 @@ ANN( parlay::sequence<vtx*>& v, int k )
       if( report_stats )
          std::cout << "depth = " << T.tree->depth() << std::endl;
 
-      if( algorithm_version == 0 )
-      {  // this is for starting from root
-         // this reorders the vertices for locality
-         _t.reset(), _t.start();
-         parlay::sequence<vtx*> vr = T.vertices();
-         // t.next( "flatten tree" );
+      auto aveQuery = time_loop(
+          1, 1.0, [&]() {},
+          [&]()
+          {
+             if( algorithm_version == 0 )
+             {  // this is for starting from root
+                // this reorders the vertices for locality
+                parlay::sequence<vtx*> vr = T.vertices();
+                // t.next( "flatten tree" );
 
-         // find nearest k neighbors for each point
-         size_t n = vr.size();
-         parlay::parallel_for(
-             0, n, [&]( size_t i ) { T.k_nearest( vr[i], k ); }, 1 );
-         _t.stop();
-         std::cout << _t.total_time << " "
-                   << "-1 -1" << std::endl
-                   << std::flush;
-      }
-      else if( algorithm_version == 1 )
-      {
-         parlay::sequence<vtx*> vr = T.vertices();
-         // t.next( "flatten tree" );
-
-         int dims = ( v[0]->pt ).dimension();
-         node* root = T.tree.get();
-         box_delta bd = T.get_box_delta( dims );
-         size_t n = vr.size();
-         parlay::parallel_for(
-             0, n,
-             [&]( size_t i )
+                // find nearest k neighbors for each point
+                size_t n = vr.size();
+                parlay::parallel_for(
+                    0, n, [&]( size_t i ) { T.k_nearest( vr[i], k ); } );
+             }
+             else if( algorithm_version == 1 )
              {
-                T.k_nearest_leaf(
-                    vr[i], T.find_leaf( vr[i]->pt, root, bd.first, bd.second ),
-                    k );
-             } );
-      }
-      else
-      {  //(algorithm_version == 2) this is for starting from leaf, finding leaf
-         // using map()
-         auto f = [&]( vtx* p, node* n )
-         { return T.k_nearest_leaf( p, n, k ); };
+                parlay::sequence<vtx*> vr = T.vertices();
+                // t.next( "flatten tree" );
 
-         // find nearest k neighbors for each point
-         T.tree->map( f );
-      }
+                int dims = ( v[0]->pt ).dimension();
+                node* root = T.tree.get();
+                box_delta bd = T.get_box_delta( dims );
+                size_t n = vr.size();
+                parlay::parallel_for(
+                    0, n,
+                    [&]( size_t i )
+                    {
+                       T.k_nearest_leaf(
+                           vr[i],
+                           T.find_leaf( vr[i]->pt, root, bd.first, bd.second ),
+                           k );
+                    } );
+             }
+             else
+             {  //(algorithm_version == 2) this is for starting from leaf,
+                // finding leaf
+                //  using map()
+                auto f = [&]( vtx* p, node* n )
+                { return T.k_nearest_leaf( p, n, k ); };
+
+                // find nearest k neighbors for each point
+                T.tree->map( f );
+             }
+          },
+          [&]() {} );
+      std::cout << aveQuery << " -1 -1" << std::endl << std::flush;
 
       // t.next( "try all" );
       if( report_stats )
