@@ -40,7 +40,7 @@ int algorithm_version = 0;
 // places pointers to them in the .ngh field of each vertex
 template <int max_k, class vtx>
 void
-ANN( parlay::sequence<vtx*>& v, int k )
+ANN( parlay::sequence<vtx*>& v, int k, int rounds )
 {
    //  timer t( "ANN", report_stats );
 
@@ -73,9 +73,11 @@ ANN( parlay::sequence<vtx*>& v, int k )
       // build tree with optional box
       knn_tree T( v, whole_box );
       double aveBuild = time_loop(
-          3, 1.0, [&]() { parlay::random_shuffle( v.cut( 0, size ) ); },
+          rounds, 1.0,
+          [&]() { v = parlay::random_shuffle( v.cut( 0, size ) ); },
           [&]() { T = knn_tree( v, whole_box ); }, [&]() { T.tree.reset(); } );
       std::cout << aveBuild << " " << std::flush;
+      // return;
 
       // prelims for insert/delete
       int dims = v[0]->pt.dimension();
@@ -92,16 +94,21 @@ ANN( parlay::sequence<vtx*>& v, int k )
 
       if( report_stats )
          std::cout << "depth = " << T.tree->depth() << std::endl;
-
+      parlay::sequence<vtx*> vr;
       auto aveQuery = time_loop(
-          1, 1.0, [&]() {},
+          rounds, 1.0,
+          [&]()
+          {
+             vr = T.vertices();
+             vr = parlay::random_shuffle( vr.cut( 0, vr.size() ) );
+          },
           [&]()
           {
              if( algorithm_version == 0 )
              {  // this is for starting from root
                 // this reorders the vertices for locality
-                parlay::sequence<vtx*> vr = T.vertices();
                 // t.next( "flatten tree" );
+                //  parlay::sequence<vtx*> vr = T.vertices();
 
                 // find nearest k neighbors for each point
                 size_t n = vr.size();

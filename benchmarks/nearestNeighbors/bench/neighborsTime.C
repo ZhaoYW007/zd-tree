@@ -65,7 +65,7 @@ timeNeighbors( parlay::sequence<point>& pts, int k, int rounds, char* outFile )
    auto vv = parlay::tabulate(
        n, [&]( size_t i ) -> vtx { return vtx( pts[i], i ); } );
    auto v = parlay::tabulate( n, [&]( size_t i ) -> vtx* { return &vv[i]; } );
-   ANN<maxK>( v, k );
+   ANN<maxK>( v, k, rounds );
 
    if( outFile != NULL )
    {
