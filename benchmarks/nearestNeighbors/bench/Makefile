@@ -1,3 +1,5 @@
+export LD_PRELOAD=/usr/local/lib/libjemalloc.so.2
+
 include common/parallelDefs
 BNCHMRK = neighbors
 

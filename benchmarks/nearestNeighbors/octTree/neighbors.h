@@ -30,6 +30,7 @@ int algorithm_version = 0;
 #include <queue>
 
 #include "common/geometry.h"
+#include "common/geometryIO.h"
 #include "common/time_loop.h"
 #include "k_nearest_neighbors.h"
 #include "parlay/parallel.h"
@@ -40,7 +41,8 @@ int algorithm_version = 0;
 // places pointers to them in the .ngh field of each vertex
 template <int max_k, class vtx>
 void
-ANN( parlay::sequence<vtx*>& v, int k, int rounds )
+ANN( const parlay::sequence<vtx*>& v, int k, int rounds,
+     const parlay::sequence<vtx*>& vin, int tag )
 {
    //  timer t( "ANN", report_stats );
 
@@ -52,48 +54,108 @@ ANN( parlay::sequence<vtx*>& v, int k, int rounds )
       using box = typename knn_tree::box;
       using box_delta = std::pair<box, double>;
 
-      box whole_box = knn_tree::o_tree::get_box( v );
-
       // create sequences for insertion and deletion
       size_t size = v.size();
-      size_t p = .5 * size;
-      parlay::sequence<vtx*> v1 = parlay::sequence<vtx*>( p );
-      parlay::sequence<vtx*> v2 = parlay::sequence<vtx*>( p );
-      parlay::parallel_for(
-          0, size,
-          [&]( size_t i )
-          {
-             if( i < p )
-                v1[i] = v[i];
-             else
-                v2[i - p] = v[i];
-          },
-          1 );
+      // size_t p = .5 * size;
+      // parlay::sequence<vtx*> v1 = parlay::sequence<vtx*>( p );
+      // parlay::parallel_for(
+      //     0, size,
+      //     [&]( size_t i )
+      //     {
+      //        if( i < p )
+      //           v1[i] = v[i];
+      //        else
+      //           v2[i - p] = v[i];
+      //     },
+      //     1 );
 
       // build tree with optional box
-      knn_tree T( v, whole_box );
+
+      parlay::sequence<vtx*> v2 = parlay::sequence<vtx*>( v.size() );
+      parlay::copy( v, v2 );
+
+      box whole_box = knn_tree::o_tree::get_box( v2 );
+      knn_tree T = knn_tree( v2, whole_box );
+
       double aveBuild = time_loop(
           rounds, 1.0,
-          [&]() { v = parlay::random_shuffle( v.cut( 0, size ) ); },
-          [&]() { T = knn_tree( v, whole_box ); }, [&]() { T.tree.reset(); } );
+          [&]()
+          {
+             parlay::copy( v, v2 );
+             whole_box = knn_tree::o_tree::get_box( v2 );
+          },
+          [&]() { T = knn_tree( v2, whole_box ); }, [&]() { T.tree.reset(); } );
       std::cout << aveBuild << " " << std::flush;
-      // return;
+
+      //* restore
+      parlay::copy( v, v2 );
+      whole_box = knn_tree::o_tree::get_box( v2 );
+      T = knn_tree( v2, whole_box );
 
       // prelims for insert/delete
-      int dims = v[0]->pt.dimension();
-      node* root = T.tree.get();
-      box_delta bd = T.get_box_delta( dims );
+      int dims;
+      node* root;
+      box_delta bd;
+      parlay::sequence<vtx*> vin2 = parlay::sequence<vtx*>( vin.size() );
+
+      //* batch-dynamic insertion
+      if( tag >= 1 )
+      {
+         double aveInsert = time_loop(
+             rounds, 1.0,
+             [&]()
+             {
+                T.tree.reset();
+                parlay::copy( v, v2 );
+                parlay::copy( vin, vin2 );
+                auto allv = parlay::append( v2, vin2 );
+
+                whole_box = knn_tree::o_tree::get_box( allv );
+                T = knn_tree( v2, whole_box );
+
+                dims = vin2[0]->pt.dimension();
+                root = T.tree.get();
+                bd = T.get_box_delta( dims );
+             },
+             [&]() { T.batch_insert( vin2, root, bd.first, bd.second ); },
+             [&]() { T.tree.reset(); } );
+         std::cout << aveInsert << " " << std::flush;
+
+         //* restore
+         T.tree.reset();
+         parlay::copy( v, v2 );
+         parlay::copy( vin, vin2 );
+         auto allv = parlay::append( v2, vin2 );
+
+         whole_box = knn_tree::o_tree::get_box( allv );
+         T = knn_tree( v2, whole_box );
+
+         dims = vin2[0]->pt.dimension();
+         root = T.tree.get();
+         bd = T.get_box_delta( dims );
+         T.batch_insert( vin2, root, bd.first, bd.second );
+         //! no need to append vin since KNN graph always get points from the
+         //! tree
+      }
+      else
+      {
+         std::cout << "-1 " << std::flush;
+      }
+
+      if( tag >= 2 )
+      {
+      }
+      else
+      {
+         std::cout << "-1 " << std::flush;
+      }
 
       // batch-dynamic deletion
       // T.batch_delete(v2, root, bd.first, bd.second);
       // //t.next("batch deletion");
 
-      // batch-dynamic insertion
-      // T.batch_insert(v2, root, bd.first, bd.second);
-      // //t.next("batch insertion");
-
-      if( report_stats )
-         std::cout << "depth = " << T.tree->depth() << std::endl;
+      // if( report_stats )
+      // std::cout << "depth = " << T.tree->depth() << std::endl;
       parlay::sequence<vtx*> vr;
       auto aveQuery = time_loop(
           rounds, 1.0,

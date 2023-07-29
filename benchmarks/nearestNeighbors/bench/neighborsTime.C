@@ -23,8 +23,6 @@
 #include <algorithm>
 #include <iostream>
 
-#include "common/geometry.h"
-#include "common/geometryIO.h"
 #include "common/parse_command_line.h"
 #include "parlay/parallel.h"
 #include "parlay/primitives.h"
@@ -57,7 +55,8 @@ struct vertex
 
 template <int maxK, class point>
 void
-timeNeighbors( parlay::sequence<point>& pts, int k, int rounds, char* outFile )
+timeNeighbors( parlay::sequence<point>& pts, int k, int rounds, char* outFile,
+               parlay::sequence<point>& pin, int tag )
 {
    size_t n = pts.size();
    using vtx = vertex<point, maxK>;
@@ -65,7 +64,17 @@ timeNeighbors( parlay::sequence<point>& pts, int k, int rounds, char* outFile )
    auto vv = parlay::tabulate(
        n, [&]( size_t i ) -> vtx { return vtx( pts[i], i ); } );
    auto v = parlay::tabulate( n, [&]( size_t i ) -> vtx* { return &vv[i]; } );
-   ANN<maxK>( v, k, rounds );
+
+   auto pin2 = parlay::tabulate(
+       pin.size(), [&]( size_t i ) -> vtx { return vtx( pin[i], i ); } );
+   auto vin = parlay::tabulate( pin.size(),
+                                [&]( size_t i ) -> vtx* { return &pin2[i]; } );
+
+   //! cannot remove these two vectors
+   // decltype( vv )().swap( vv );
+   // decltype( pin2 )().swap( pin2 );
+
+   ANN<maxK>( v, k, rounds, vin, tag );
 
    if( outFile != NULL )
    {
@@ -100,11 +109,12 @@ main( int argc, char* argv[] )
 {
    commandLine P( argc, argv,
                   "[-k {1,...,100}] [-d {2,3}] [-o <outFile>] [-r <rounds>] "
-                  "[-p <inFile>] [-t <tag>]" );
+                  "[-p <inFile>] [-t <tag>] [-i <insertFile>]" );
    char* iFile = P.getOptionValue( "-p" );
    char* oFile = P.getOptionValue( "-o" );
+   char* _insertFile = P.getOptionValue( "-i" );
    int rounds = P.getOptionIntValue( "-r", 3 );
-   int k = P.getOptionIntValue( "-k", 1 );
+   int k = P.getOptionIntValue( "-k", 100 );
    int d = P.getOptionIntValue( "-d", 3 );
    int tag = P.getOptionIntValue( "-t", -1 );
    //  algorithm_version = P.getOptionIntValue( "-t", algorithm_version );
@@ -117,21 +127,61 @@ main( int argc, char* argv[] )
 
    if( d == 2 )
    {
-      // parlay::sequence<point2> PIn = readPointsFromFile<point2>( iFile );
       parlay::sequence<point2> PIn = readGeneral<point2>( iFile );
+      parlay::sequence<point2> PInsert;
+      // parlay::sequence<point2> PIn = readPointsFromFile<point2>( iFile );
+      if( tag == 1 )
+      {
+         std::string insertFile;
+         if( _insertFile == NULL )
+         {
+            int id = std::stoi( name.substr( 0, name.find_first_of( '.' ) ) );
+            id = ( id + 1 ) % 3;  //! MOD graph number used to test
+            if( !id ) id++;
+            int pos = std::string( iFile ).rfind( "/" ) + 1;
+            insertFile = std::string( iFile ).substr( 0, pos ) +
+                         std::to_string( id ) + ".in";
+         }
+         else
+         {
+            insertFile = std::string( _insertFile );
+         }
+         PInsert = readGeneral<point2>( insertFile.c_str() );
+      }
+
       if( k == 1 )
-         timeNeighbors<1>( PIn, 1, rounds, oFile );
+         timeNeighbors<1>( PIn, 1, rounds, oFile, PInsert, tag );
       else
-         timeNeighbors<100>( PIn, k, rounds, oFile );
+         timeNeighbors<100>( PIn, k, rounds, oFile, PInsert, tag );
    }
 
    if( d == 3 )
    {
-      // parlay::sequence<point3> PIn = readPointsFromFile<point3>( iFile );
       parlay::sequence<point3> PIn = readGeneral<point3>( iFile );
+      parlay::sequence<point3> PInsert;
+      // parlay::sequence<point3> PIn = readPointsFromFile<point3>( iFile );
+      if( tag == 1 )
+      {
+         std::string insertFile;
+         if( _insertFile == NULL )
+         {
+            int id = std::stoi( name.substr( 0, name.find_first_of( '.' ) ) );
+            id = ( id + 1 ) % 3;  //! MOD graph number used to test
+            if( !id ) id++;
+            int pos = std::string( iFile ).rfind( "/" ) + 1;
+            insertFile = std::string( iFile ).substr( 0, pos ) +
+                         std::to_string( id ) + ".in";
+         }
+         else
+         {
+            insertFile = std::string( _insertFile );
+         }
+         PInsert = readGeneral<point3>( insertFile.c_str() );
+      }
+
       if( k == 1 )
-         timeNeighbors<1>( PIn, 1, rounds, oFile );
+         timeNeighbors<1>( PIn, 1, rounds, oFile, PInsert, tag );
       else
-         timeNeighbors<100>( PIn, k, rounds, oFile );
+         timeNeighbors<100>( PIn, k, rounds, oFile, PInsert, tag );
    }
 }

@@ -1,4 +1,4 @@
-#include "../parlay/internal/get_time.h"
+#include "parlay/internal/get_time.h"
 
 template <class F, class G, class H>
 double
@@ -13,13 +13,13 @@ time_loop( int rounds, double delay, F initf, G runf, H endf )
       runf();
       endf();
    }
-   for( int i = 0; i < rounds; i++ )
+   for( int i = 1; i <= rounds; i++ )
    {
       initf();
       t.start();
       runf();
       t.next_time();
-      if( i != rounds - 1 ) endf();
+      endf();
    }
    return t.total_time() / rounds;
 }
