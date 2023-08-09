@@ -65,8 +65,9 @@ timeNeighbors( parlay::sequence<point>& pts, int k, int rounds, char* outFile,
        n, [&]( size_t i ) -> vtx { return vtx( pts[i], i ); } );
    auto v = parlay::tabulate( n, [&]( size_t i ) -> vtx* { return &vv[i]; } );
 
-   auto pin2 = parlay::tabulate(
-       pin.size(), [&]( size_t i ) -> vtx { return vtx( pin[i], i ); } );
+   auto pin2 = parlay::tabulate( pin.size(),
+                                 [&]( size_t i ) -> vtx
+                                 { return vtx( pin[i], i + v.size() ); } );
    auto vin = parlay::tabulate( pin.size(),
                                 [&]( size_t i ) -> vtx* { return &pin2[i]; } );
 

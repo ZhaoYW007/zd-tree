@@ -161,8 +161,8 @@ ANN( const parlay::sequence<vtx*>& v, int k, int rounds,
           rounds, 1.0,
           [&]()
           {
-             vr = T.vertices();
-             vr = parlay::random_shuffle( vr.cut( 0, vr.size() ) );
+             //  vr = T.vertices();
+             //  vr = parlay::random_shuffle( vr.cut( 0, vr.size() ) );
           },
           [&]()
           {
@@ -173,6 +173,8 @@ ANN( const parlay::sequence<vtx*>& v, int k, int rounds,
                 //  parlay::sequence<vtx*> vr = T.vertices();
 
                 // find nearest k neighbors for each point
+                vr = T.vertices();
+                //  vr = parlay::random_shuffle( vr.cut( 0, vr.size() ) );
                 size_t n = vr.size();
                 parlay::parallel_for(
                     0, n, [&]( size_t i ) { T.k_nearest( vr[i], k ); } );
