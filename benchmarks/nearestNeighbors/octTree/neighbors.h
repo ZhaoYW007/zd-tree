@@ -144,6 +144,40 @@ ANN( const parlay::sequence<vtx*>& v, int k, int rounds,
 
       if( tag >= 2 )
       {
+         double aveDelete = time_loop(
+             rounds, 1.0,
+             [&]()
+             {
+                T.tree.reset();
+                parlay::copy( v, v2 );
+                parlay::copy( vin, vin2 );
+                auto allv = parlay::append( v2, vin2 );
+
+                whole_box = knn_tree::o_tree::get_box( allv );
+                T = knn_tree( v2, whole_box );
+
+                dims = vin2[0]->pt.dimension();
+                root = T.tree.get();
+                bd = T.get_box_delta( dims );
+                T.batch_insert( vin2, root, bd.first, bd.second );
+             },
+             [&]() { T.batch_delete( vin2, root, bd.first, bd.second ); },
+             [&]() { T.tree.reset(); } );
+         std::cout << aveDelete << " " << std::flush;
+
+         T.tree.reset();
+         parlay::copy( v, v2 );
+         parlay::copy( vin, vin2 );
+         auto allv = parlay::append( v2, vin2 );
+
+         whole_box = knn_tree::o_tree::get_box( allv );
+         T = knn_tree( v2, whole_box );
+
+         dims = vin2[0]->pt.dimension();
+         root = T.tree.get();
+         bd = T.get_box_delta( dims );
+         T.batch_insert( vin2, root, bd.first, bd.second );
+         T.batch_delete( vin2, root, bd.first, bd.second );
       }
       else
       {
