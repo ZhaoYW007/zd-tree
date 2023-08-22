@@ -75,6 +75,7 @@ struct oct_tree
    static box
    get_box( Seq& V )
    {  // parlay::sequence<vtx*> &V) {
+      if( V.size() == 0 ) abort();
       size_t n = V.size();
       auto minmax = [&]( box x, box y ) {
          return box( x.first.minCoords( y.first ),
@@ -247,19 +248,37 @@ struct oct_tree
          for( size_t i = 0; i < v.size(); i++ ) print_point( v[i].second->pt );
       }
 
+      bool
+      are_equal( point p, point q, int d )
+      {
+         for( int i = 0; i < d; i++ )
+         {
+            if( p[i] != q[i] ) return false;
+         }
+         return true;
+      }
+
       void
       batch_remove( slice_t points_to_delete )
       {
          int deleted_size = points_to_delete.size();
+         parlay::sequence<bool> indices_to_retain( P.size(), true );
          for( size_t i = 0; i < deleted_size; i++ )
          {
-            auto pred1 = [&]( indexed_point a )
-            { return a != points_to_delete[i]; };
-            indexed_pts = remove_if( indexed_pts, pred1 );
-            auto pred2 = [&]( vtx* a )
-            { return a != points_to_delete[i].second; };
-            P = remove_if( P, pred2 );
+            for( size_t j = 0; j < P.size(); j++ )
+            {
+               if( are_equal( points_to_delete[i].second->pt, P[j]->pt,
+                              P[j]->pt.dimension() ) )
+               {
+                  indices_to_retain[j] = false;
+                  break;
+               }
+            }
          }
+         auto new_P = parlay::pack( P, indices_to_retain );
+         P = new_P;
+         auto new_idpts = parlay::pack( indexed_pts, indices_to_retain );
+         indexed_pts = new_idpts;
          n -= deleted_size;
          b = get_box( P );
          set_center();
@@ -383,6 +402,18 @@ struct oct_tree
       node&
       operator=( node&& ) = delete;
 
+      void
+      set_aug( size_t v )
+      {
+         this->aug = v;
+      }
+
+      size_t
+      get_aug()
+      {
+         return this->aug;
+      }
+
       static node*
       alloc_node();
       static void
@@ -396,6 +427,7 @@ struct oct_tree
       box b;
       point centerv;
       leaf_seq P;
+      size_t aug = 0;
 
       void
       set_center()
@@ -443,7 +475,21 @@ struct oct_tree
       auto x = parlay::sort( indexed_points, less );
       // get a new tree based on the sorted sequence
       int new_bit = T->bit;
+      // size_t pos=0;
+      // while(!(pos==0 | pos==indexed_points.size())){
+      //   new_bit--;
+      //   size_t val = ((size_t) 1) << (new_bit - 1);
+      //   size_t mask = (new_bit == 64) ? ~((size_t) 0) : ~(~((size_t) 0) <<
+      //   new_bit); auto less = [&] (indexed_point x) {
+      //     return (x.first & mask) < val;
+      //   };
+      //   // and then we binary search for the cut point
+      //   size_t pos = parlay::internal::binary_search(indexed_points, less);
+      // }
+      // std::cout << x.size() << std::endl;
+      // std::cout << new_bit << std::endl;
       node* parent = build_recursive( parlay::make_slice( x ), new_bit );
+      // std::cout << "built tree" << std::endl;
       // set everyone's parent pointers and delete the old node
       node* grandparent = T->Parent();
       if( grandparent->Left() == T )
@@ -746,7 +792,11 @@ struct oct_tree
       // if run out of bit, or small then generate a leaf
       if( bit == 0 || n < node_cutoff )
       {
-         return node::new_leaf( Pts, bit );
+         // std::cout << "creating leaf" << std::endl;
+         // std::cout << Pts.size() << std::endl;
+         node* N = node::new_leaf( Pts, bit );
+         // std::cout << "made leaf" << std::endl;
+         return N;
       }
       else
       {

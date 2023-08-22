@@ -56,7 +56,7 @@ struct vertex
 template <int maxK, class point>
 void
 timeNeighbors( parlay::sequence<point>& pts, int k, int rounds, char* outFile,
-               parlay::sequence<point>& pin, int tag )
+               parlay::sequence<point>& pin, int tag, int queryType )
 {
    size_t n = pts.size();
    using vtx = vertex<point, maxK>;
@@ -75,7 +75,7 @@ timeNeighbors( parlay::sequence<point>& pts, int k, int rounds, char* outFile,
    // decltype( vv )().swap( vv );
    // decltype( pin2 )().swap( pin2 );
 
-   ANN<maxK>( v, k, rounds, vin, tag );
+   ANN<maxK>( v, k, rounds, vin, tag, queryType );
 
    if( outFile != NULL )
    {
@@ -108,9 +108,10 @@ readGeneral( char const* fname )
 int
 main( int argc, char* argv[] )
 {
-   commandLine P( argc, argv,
-                  "[-k {1,...,100}] [-d {2,3}] [-o <outFile>] [-r <rounds>] "
-                  "[-p <inFile>] [-t <tag>] [-i <insertFile>]" );
+   commandLine P(
+       argc, argv,
+       "[-k {1,...,100}] [-d {2,3}] [-o <outFile>] [-r <rounds>] "
+       "[-p <inFile>] [-t <tag>] [-q <queryType>] [-i <insertFile>]" );
    char* iFile = P.getOptionValue( "-p" );
    char* oFile = P.getOptionValue( "-o" );
    char* _insertFile = P.getOptionValue( "-i" );
@@ -118,6 +119,7 @@ main( int argc, char* argv[] )
    int k = P.getOptionIntValue( "-k", 100 );
    int d = P.getOptionIntValue( "-d", 3 );
    int tag = P.getOptionIntValue( "-t", -1 );
+   int queryType = P.getOptionIntValue( "-q", 0 );
    //  algorithm_version = P.getOptionIntValue( "-t", algorithm_version );
    if( k < 1 || k > 100 ) P.badArgument();
    if( d < 2 || d > 3 ) P.badArgument();
@@ -131,7 +133,7 @@ main( int argc, char* argv[] )
       parlay::sequence<point2> PIn = readGeneral<point2>( iFile );
       parlay::sequence<point2> PInsert;
       // parlay::sequence<point2> PIn = readPointsFromFile<point2>( iFile );
-      if( tag == 1 )
+      if( tag >= 1 )
       {
          std::string insertFile;
          if( _insertFile == NULL )
@@ -151,9 +153,9 @@ main( int argc, char* argv[] )
       }
 
       if( k == 1 )
-         timeNeighbors<1>( PIn, 1, rounds, oFile, PInsert, tag );
+         timeNeighbors<1>( PIn, 1, rounds, oFile, PInsert, tag, queryType );
       else
-         timeNeighbors<100>( PIn, k, rounds, oFile, PInsert, tag );
+         timeNeighbors<100>( PIn, k, rounds, oFile, PInsert, tag, queryType );
    }
 
    if( d == 3 )
@@ -161,7 +163,7 @@ main( int argc, char* argv[] )
       parlay::sequence<point3> PIn = readGeneral<point3>( iFile );
       parlay::sequence<point3> PInsert;
       // parlay::sequence<point3> PIn = readPointsFromFile<point3>( iFile );
-      if( tag == 1 )
+      if( tag >= 1 )
       {
          std::string insertFile;
          if( _insertFile == NULL )
@@ -181,8 +183,8 @@ main( int argc, char* argv[] )
       }
 
       if( k == 1 )
-         timeNeighbors<1>( PIn, 1, rounds, oFile, PInsert, tag );
+         timeNeighbors<1>( PIn, 1, rounds, oFile, PInsert, tag, queryType );
       else
-         timeNeighbors<100>( PIn, k, rounds, oFile, PInsert, tag );
+         timeNeighbors<100>( PIn, k, rounds, oFile, PInsert, tag, queryType );
    }
 }

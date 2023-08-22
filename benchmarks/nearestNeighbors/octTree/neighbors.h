@@ -37,12 +37,14 @@ int algorithm_version = 0;
 #include "parlay/primitives.h"
 #include "parlay/random.h"
 
+//* export LD_PRELOAD=/usr/local/lib/libjemalloc.so.2 *//
+
 // find the k nearest neighbors for all points in tree
 // places pointers to them in the .ngh field of each vertex
 template <int max_k, class vtx>
 void
 ANN( const parlay::sequence<vtx*>& v, int k, int rounds,
-     const parlay::sequence<vtx*>& vin, int tag )
+     const parlay::sequence<vtx*>& vin, int tag, int queryType )
 {
    //  timer t( "ANN", report_stats );
 
@@ -56,20 +58,6 @@ ANN( const parlay::sequence<vtx*>& v, int k, int rounds,
 
       // create sequences for insertion and deletion
       size_t size = v.size();
-      // size_t p = .5 * size;
-      // parlay::sequence<vtx*> v1 = parlay::sequence<vtx*>( p );
-      // parlay::parallel_for(
-      //     0, size,
-      //     [&]( size_t i )
-      //     {
-      //        if( i < p )
-      //           v1[i] = v[i];
-      //        else
-      //           v2[i - p] = v[i];
-      //     },
-      //     1 );
-
-      // build tree with optional box
 
       parlay::sequence<vtx*> v2 = parlay::sequence<vtx*>( v.size() );
       parlay::copy( v, v2 );
@@ -128,7 +116,7 @@ ANN( const parlay::sequence<vtx*>& v, int k, int rounds,
          auto allv = parlay::append( v2, vin2 );
 
          whole_box = knn_tree::o_tree::get_box( allv );
-         T = knn_tree( v2, whole_box );
+         T = knn_tree( allv, whole_box );
 
          dims = vin2[0]->pt.dimension();
          root = T.tree.get();
@@ -154,15 +142,17 @@ ANN( const parlay::sequence<vtx*>& v, int k, int rounds,
                 auto allv = parlay::append( v2, vin2 );
 
                 whole_box = knn_tree::o_tree::get_box( allv );
-                T = knn_tree( v2, whole_box );
+                //* warning not the same as others
+                T = knn_tree( allv, whole_box );
+                //  T = knn_tree( v2, whole_box );
 
                 dims = vin2[0]->pt.dimension();
                 root = T.tree.get();
                 bd = T.get_box_delta( dims );
-                T.batch_insert( vin2, root, bd.first, bd.second );
+                //  T.batch_insert( vin2, root, bd.first, bd.second );
              },
              [&]() { T.batch_delete( vin2, root, bd.first, bd.second ); },
-             [&]() { T.tree.reset(); } );
+             [&]() {} );
          std::cout << aveDelete << " " << std::flush;
 
          T.tree.reset();
@@ -171,12 +161,11 @@ ANN( const parlay::sequence<vtx*>& v, int k, int rounds,
          auto allv = parlay::append( v2, vin2 );
 
          whole_box = knn_tree::o_tree::get_box( allv );
-         T = knn_tree( v2, whole_box );
+         T = knn_tree( allv, whole_box );
 
          dims = vin2[0]->pt.dimension();
          root = T.tree.get();
          bd = T.get_box_delta( dims );
-         T.batch_insert( vin2, root, bd.first, bd.second );
          T.batch_delete( vin2, root, bd.first, bd.second );
       }
       else
@@ -184,67 +173,124 @@ ANN( const parlay::sequence<vtx*>& v, int k, int rounds,
          std::cout << "-1 " << std::flush;
       }
 
-      // batch-dynamic deletion
-      // T.batch_delete(v2, root, bd.first, bd.second);
-      // //t.next("batch deletion");
-
-      // if( report_stats )
-      // std::cout << "depth = " << T.tree->depth() << std::endl;
-      parlay::sequence<vtx*> vr;
-      auto aveQuery = time_loop(
-          rounds, 1.0,
-          [&]()
-          {
-             //  vr = T.vertices();
-             //  vr = parlay::random_shuffle( vr.cut( 0, vr.size() ) );
-          },
-          [&]()
-          {
-             if( algorithm_version == 0 )
-             {  // this is for starting from root
-                // this reorders the vertices for locality
-                // t.next( "flatten tree" );
-                //  parlay::sequence<vtx*> vr = T.vertices();
-
-                // find nearest k neighbors for each point
-                vr = T.vertices();
-                //  vr = parlay::random_shuffle( vr.cut( 0, vr.size() ) );
-                size_t n = vr.size();
-                parlay::parallel_for(
-                    0, n, [&]( size_t i ) { T.k_nearest( vr[i], k ); } );
-             }
-             else if( algorithm_version == 1 )
+      // parlay::sequence<vtx*> vr;
+      if( queryType & ( 1 << 0 ) )
+      {
+         auto aveQuery = time_loop(
+             rounds, 1.0,
+             [&]()
              {
-                parlay::sequence<vtx*> vr = T.vertices();
-                // t.next( "flatten tree" );
+                //  vr = T.vertices();
+                //  vr = parlay::random_shuffle( vr.cut( 0, vr.size() ) );
+             },
+             [&]()
+             {
+                if( algorithm_version == 0 )
+                {  // this is for starting from root
+                   parlay::sequence<vtx*> vr = T.vertices();
 
-                int dims = ( v[0]->pt ).dimension();
-                node* root = T.tree.get();
-                box_delta bd = T.get_box_delta( dims );
-                size_t n = vr.size();
-                parlay::parallel_for(
-                    0, n,
-                    [&]( size_t i )
-                    {
-                       T.k_nearest_leaf(
-                           vr[i],
-                           T.find_leaf( vr[i]->pt, root, bd.first, bd.second ),
-                           k );
-                    } );
-             }
-             else
-             {  //(algorithm_version == 2) this is for starting from leaf,
-                // finding leaf
-                //  using map()
-                auto f = [&]( vtx* p, node* n )
-                { return T.k_nearest_leaf( p, n, k ); };
+                   // find nearest k neighbors for each point
+                   //  vr = T.vertices();
+                   //  vr = parlay::random_shuffle( vr.cut( 0, vr.size() ) );
+                   size_t n = vr.size();
+                   parlay::parallel_for(
+                       0, n, [&]( size_t i ) { T.k_nearest( vr[i], k ); } );
+                }
+                else if( algorithm_version == 1 )
+                {
+                   parlay::sequence<vtx*> vr = T.vertices();
+                   // t.next( "flatten tree" );
 
-                // find nearest k neighbors for each point
-                T.tree->map( f );
-             }
-          },
-          [&]() {} );
-      std::cout << aveQuery << " -1 -1" << std::endl << std::flush;
+                   int dims = ( v[0]->pt ).dimension();
+                   node* root = T.tree.get();
+                   box_delta bd = T.get_box_delta( dims );
+                   size_t n = vr.size();
+                   parlay::parallel_for(
+                       0, n,
+                       [&]( size_t i )
+                       {
+                          T.k_nearest_leaf( vr[i],
+                                            T.find_leaf( vr[i]->pt, root,
+                                                         bd.first, bd.second ),
+                                            k );
+                       } );
+                }
+                else
+                {  //(algorithm_version == 2) this is for starting from leaf,
+                   // finding leaf
+                   //  using map()
+                   auto f = [&]( vtx* p, node* n )
+                   { return T.k_nearest_leaf( p, n, k ); };
+
+                   // find nearest k neighbors for each point
+                   T.tree->map( f );
+                }
+             },
+             [&]() {} );
+         std::cout << aveQuery << " -1 -1 " << std::flush;
+      }
+      else
+      {
+         std::cout << "-1 -1 -1 " << std::flush;
+      }
+
+      int queryNum = 1000;
+      if( queryType & ( 1 << 1 ) )
+      {
+         double aveQuery = time_loop(
+             rounds, 1.0, [&]() {},
+             [&]()
+             {
+                for( int i = 0; i < 1; i++ )
+                {
+                   parlay::sequence<vtx*> pts{ v[i],
+                                               v[( i + size / 2 ) % size] };
+                   box queryBox = knn_tree::o_tree::get_box( pts );
+                   int dims = ( v[0]->pt ).dimension();
+                   box_delta bd = T.get_box_delta( dims );
+                   T.range_count( T.tree.get(), queryBox, 1e-7 );
+                   //  std::cout << T.tree.get()->get_aug() << std::endl;
+                }
+             },
+             [&]() {} );
+         std::cout << aveQuery * queryNum << " " << std::flush;
+      }
+      else
+      {
+         std::cout << "-1 " << std::flush;
+      }
+
+      if( queryType & ( 1 << 2 ) )
+      {
+         parlay::sequence<vtx*> Out( size );
+
+         double aveQuery = time_loop(
+             rounds, 1.0, [&]() {},
+             [&]()
+             {
+                for( int i = 0; i < 1; i++ )
+                {
+                   parlay::sequence<vtx*> pts{ v[i],
+                                               v[( i + size / 2 ) % size] };
+                   box queryBox = knn_tree::o_tree::get_box( pts );
+                   int dims = ( v[0]->pt ).dimension();
+                   box_delta bd = T.get_box_delta( dims );
+                   T.range_count( T.tree.get(), queryBox, 1e-7 );
+                   T.range_query( T.tree.get(),
+                                  Out.cut( 0, T.tree.get()->get_aug() ),
+                                  queryBox, 1e-7 );
+                   //  std::cout << T.tree.get()->get_aug() << std::endl;
+                }
+             },
+             [&]() {} );
+         std::cout << aveQuery * queryNum << " " << std::flush;
+      }
+      else
+      {
+         std::cout << "-1 " << std::flush;
+      }
+
+      std::cout << std::endl << std::flush;
 
       // t.next( "try all" );
       if( report_stats )
