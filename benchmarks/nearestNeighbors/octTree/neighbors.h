@@ -234,14 +234,14 @@ ANN( const parlay::sequence<vtx*>& v, int k, int rounds,
          std::cout << "-1 -1 -1 " << std::flush;
       }
 
-      int queryNum = 1000;
+      int queryNum = 100;
       if( queryType & ( 1 << 1 ) )
       {
          double aveQuery = time_loop(
              rounds, 1.0, [&]() {},
              [&]()
              {
-                for( int i = 0; i < 1; i++ )
+                for( int i = 0; i < 10; i++ )
                 {
                    parlay::sequence<vtx*> pts{ v[i],
                                                v[( i + size / 2 ) % size] };
@@ -268,7 +268,7 @@ ANN( const parlay::sequence<vtx*>& v, int k, int rounds,
              rounds, 1.0, [&]() {},
              [&]()
              {
-                for( int i = 0; i < 1; i++ )
+                for( int i = 0; i < 10; i++ )
                 {
                    parlay::sequence<vtx*> pts{ v[i],
                                                v[( i + size / 2 ) % size] };

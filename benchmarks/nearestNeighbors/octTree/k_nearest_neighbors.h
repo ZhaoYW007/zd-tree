@@ -736,10 +736,14 @@ struct k_nearest_neighbors
       if( T->is_leaf() )
       {
          size_t cnt = 0;
+         parlay::sequence<vtx*>& Vtx = T->Vertices();
          for( int i = 0; i < T->size(); i++ )
          {
-            if( within_box( T, T->Vertices()[i], Delta ) )
+            if( within_box( T, Vtx[i], Delta ) )
             {
+               // std::cout << Vtx[i]->pt << "--" << queryBox.first << " "
+               //           << queryBox.second << std::endl
+               //           << std::flush;
                cnt++;
             }
          }
