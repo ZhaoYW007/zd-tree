@@ -23,6 +23,8 @@
 #include <algorithm>
 #include <iostream>
 
+#include "../benchmarks/nearestNeighbors/octTree/neighbors.h"
+#include "common/IO.h"
 #include "common/parse_command_line.h"
 #include "parlay/parallel.h"
 #include "parlay/primitives.h"
