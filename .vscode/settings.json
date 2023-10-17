@@ -1,6 +1,10 @@
 {
     "files.associations": {
         "neighborsTime.C": "cpp",
-        "randPoints.C": "cpp"
+        "randPoints.C": "cpp",
+        "neighborsTime copy.C": "cpp",
+        "neighborsTimeCKNN.C": "cpp",
+        "map": "cpp",
+        "system_error": "cpp"
     }
 }
