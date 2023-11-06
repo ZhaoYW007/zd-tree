@@ -64,31 +64,32 @@ void timeNeighbors( parlay::sequence<point>& pts, int k, int rounds,
   auto vv = parlay::tabulate(
       n, [&]( size_t i ) -> vtx { return vtx( pts[i], i ); } );
 
-  auto v = parlay::tabulate( n, [&]( size_t i ) -> vtx* { return &vv[i]; } );
+  // auto v = parlay::tabulate( n, [&]( size_t i ) -> vtx* { return &vv[i]; } );
 
   auto pin2 = parlay::tabulate( pin.size(), [&]( size_t i ) -> vtx {
-    return vtx( pin[i], i + v.size() );
+    return vtx( pin[i], i + vv.size() );
   } );
-  auto vin = parlay::tabulate( pin.size(),
-                               [&]( size_t i ) -> vtx* { return &pin2[i]; } );
+  // auto vin = parlay::tabulate( pin.size(),
+  //                              [&]( size_t i ) -> vtx* { return &pin2[i]; }
+  //                              );
 
   //! cannot remove these two vectors
   //! since it uses pointers for tree
   // decltype( vv )().swap( vv );
   // decltype( pin2 )().swap( pin2 );
 
-  ANN<maxK>( v, k, rounds, vin, tag, queryType );
+  ANN<maxK>( vv, k, rounds, pin2, tag, queryType );
 
-  if( outFile != NULL ) {
-    int m = n * k;
-    parlay::sequence<int> Pout( m );
-    parlay::parallel_for( 0, n - 1, [&]( size_t i ) {
-      for( int j = 0; j < k; j++ ) {
-        Pout[k * i + j] = ( v[i]->ngh[j] )->identifier;
-      }
-    } );
-    writeIntSeqToFile( Pout, outFile );
-  }
+  // if( outFile != NULL ) {
+  //   int m = n * k;
+  //   parlay::sequence<int> Pout( m );
+  //   parlay::parallel_for( 0, n - 1, [&]( size_t i ) {
+  //     for( int j = 0; j < k; j++ ) {
+  //       Pout[k * i + j] = ( v[i]->ngh[j] )->identifier;
+  //     }
+  //   } );
+  //   writeIntSeqToFile( Pout, outFile );
+  // }
 }
 
 template <class Point>
