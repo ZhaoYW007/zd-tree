@@ -5,6 +5,10 @@
         "neighborsTime copy.C": "cpp",
         "neighborsTimeCKNN.C": "cpp",
         "map": "cpp",
-        "system_error": "cpp"
+        "system_error": "cpp",
+        "ostream": "cpp",
+        "neighborsCheck.C": "cpp",
+        "unordered_map": "cpp",
+        "unordered_set": "cpp"
     }
 }
