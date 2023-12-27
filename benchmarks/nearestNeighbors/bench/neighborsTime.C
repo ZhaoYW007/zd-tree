@@ -134,7 +134,7 @@ int main(int argc, char *argv[]) {
     if (readInsertFile == 1) {
       std::string insertFile;
       int id = std::stoi(name.substr(0, name.find_first_of('.')));
-      // id = ( id + 1 ) % 3;  //! MOD graph number used to test
+      id = (id + 1) % 3; //! MOD graph number used to test
       if (!id)
         id++;
       int pos = std::string(iFile).rfind("/") + 1;
@@ -156,7 +156,7 @@ int main(int argc, char *argv[]) {
     if (readInsertFile == 1) {
       std::string insertFile;
       int id = std::stoi(name.substr(0, name.find_first_of('.')));
-      // id = ( id + 1 ) % 3;  //! MOD graph number used to test
+      id = (id + 1) % 3; //! MOD graph number used to test
       if (!id)
         id++;
       int pos = std::string(iFile).rfind("/") + 1;
