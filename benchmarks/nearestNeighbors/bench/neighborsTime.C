@@ -68,10 +68,18 @@ void timeNeighbors(parlay::sequence<point> &pts, int k, int rounds,
   // auto v = parlay::tabulate( n, [&]( size_t i ) -> vtx* { return &vv[i]; } );
 
   // std::cout << pts.size() << " " << pin.size() << std::flush;
-  auto pin2 =
-      parlay::tabulate(pin.size() * batchInsertRatio, [&](size_t i) -> vtx {
-        return vtx(pin[i], i + vv.size());
-      });
+  parlay::sequence<vtx> pin2;
+
+  if (tag == 2) {
+    pin2 =
+        parlay::tabulate(pin.size() * batchInsertRatio, [&](size_t i) -> vtx {
+          return vtx(pin[i], i + vv.size());
+        });
+  } else {
+    pin2 = parlay::tabulate(pin.size(), [&](size_t i) -> vtx {
+      return vtx(pin[i], i + vv.size());
+    });
+  }
 
   parlay::sequence<point>().swap(pin);
   // auto vin = parlay::tabulate( pin.size(),
