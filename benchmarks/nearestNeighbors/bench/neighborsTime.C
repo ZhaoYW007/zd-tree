@@ -71,12 +71,12 @@ void timeNeighbors(parlay::sequence<point> &pts, int k, int rounds,
   parlay::sequence<vtx> pin2;
 
   if (tag == 2) {
-    pin2 =
-        parlay::tabulate(pin.size() * batchInsertRatio, [&](size_t i) -> vtx {
-          return vtx(pin[i], i + vv.size());
-        });
+    pin2 = parlay::tabulate(pin.size() * 0.2, [&](size_t i) -> vtx {
+      return vtx(pin[i], i + vv.size());
+    });
   } else {
-    pin2 = parlay::tabulate(pin.size(), [&](size_t i) -> vtx {
+    // WARN: needs to recalculate before new test
+    pin2 = parlay::tabulate(pin.size() * 0.5, [&](size_t i) -> vtx {
       return vtx(pin[i], i + vv.size());
     });
   }

@@ -196,10 +196,7 @@ void ANN(parlay::sequence<vtx> &v, int k, int rounds,
     if (queryType & (1 << 0)) { //* KNN
       auto run_zdtree_knn = [&](int kth) {
         auto aveQuery = time_loop(
-            rounds, 1.0,
-            [&]() {
-
-            },
+            rounds, 1.0, [&]() {},
             [&]() {
               if (algorithm_version == 0) {
                 parlay::sequence<vtx *> vr = T.vertices();
@@ -231,8 +228,36 @@ void ANN(parlay::sequence<vtx> &v, int k, int rounds,
       }
     }
 
-    if (queryType & (1 << 1)) { //* batch query
-      std::cout << "-1 -1 -1 " << std::flush;
+    if (queryType & (1 << 1)) { // NOTE: batch query
+      auto run_batch_knn = [&](int kth, parlay::sequence<vtx> &pts,
+                               double ratios) {
+        size_t sz = static_cast<size_t>(v.size() * ratios);
+        parlay::sequence<vtx *> vr =
+            parlay::tabulate(sz, [&](size_t i) -> vtx * { return &pts[i]; });
+        auto aveQuery = time_loop(
+            rounds, 1.0, [&]() {},
+            [&]() {
+              if (algorithm_version == 0) {
+                size_t n = vr.size();
+                parlay::parallel_for(0, n, [&](size_t i) {
+                  T.k_nearest(vr[i], kth);
+                  visNodeNum[i] = vr[i]->counter + vr[i]->counter2;
+                });
+              } else if (algorithm_version == 1) {
+              } else {
+              }
+            },
+            [&]() {});
+        std::cout << aveQuery << " " << std::flush;
+      };
+
+      std::vector<double> ratios = {0.001, 0.01, 0.1, 0.2, 0.5};
+      for (auto r : ratios) {
+        run_batch_knn(k, v, r);
+      }
+      for (auto r : ratios) {
+        run_batch_knn(k, vin, r);
+      }
     }
 
     // TODO rewrite range count
@@ -289,8 +314,10 @@ void ANN(parlay::sequence<vtx> &v, int k, int rounds,
     }
 
     if (queryType & (1 << 4)) { //* batch insertion with fraction
-      double ratios[10] = {0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0};
-      for (int i = 0; i < 10; i++) {
+      // double ratios[10] = {0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0};
+      const parlay::sequence<double> ratios = {0.01, 0.02, 0.05, 0.1,
+                                               0.2,  0.5,  1.0};
+      for (int i = 0; i < ratios.size(); i++) {
         size_t sz = size_t(vin.size() * ratios[i]);
 
         double aveInsert = time_loop(
@@ -319,11 +346,13 @@ void ANN(parlay::sequence<vtx> &v, int k, int rounds,
     }
 
     if (queryType & (1 << 5)) { //* batch deletion with fraction
-      double ratios[10] = {0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0};
-      for (int i = 0; i < 10; i++) {
+      const parlay::sequence<double> ratios = {0.01, 0.02, 0.05, 0.1,
+                                               0.2,  0.5,  1.0};
+      // double ratios[10] = {0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0};
+      for (int i = 0; i < ratios.size(); i++) {
         size_t sz = size_t(v.size() * ratios[i]);
-        if (i == 9)
-          sz = v.size() - 100;
+        if (i == ratios.size() - 1)
+          sz = v.size() - 100; // NOTE: bug in their implementation
 
         double aveDelete = time_loop(
             rounds, 1.0,
