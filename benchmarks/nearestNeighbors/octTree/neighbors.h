@@ -313,13 +313,15 @@ void ANN(parlay::sequence<vtx> &v, int k, int rounds,
       }
     }
 
-    if (queryType & (1 << 4)) { //* batch insertion with fraction
+    if (queryType & (1 << 4)) { // NOTE: batch insertion with fraction
       // double ratios[10] = {0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0};
       const parlay::sequence<double> ratios = {0.01, 0.02, 0.05, 0.1,
                                                0.2,  0.5,  1.0};
+      LOG << vin.size() << ENDL;
       for (int i = 0; i < ratios.size(); i++) {
-        size_t sz = size_t(vin.size() * ratios[i]);
+        size_t sz = size_t(v.size() * ratios[i]);
 
+        LOG << "insert size: " << sz << ENDL;
         double aveInsert = time_loop(
             rounds, 1.0,
             [&]() {
@@ -345,7 +347,7 @@ void ANN(parlay::sequence<vtx> &v, int k, int rounds,
       }
     }
 
-    if (queryType & (1 << 5)) { //* batch deletion with fraction
+    if (queryType & (1 << 5)) { // NOTE: batch deletion with fraction
       const parlay::sequence<double> ratios = {0.01, 0.02, 0.05, 0.1,
                                                0.2,  0.5,  1.0};
       // double ratios[10] = {0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0};
@@ -360,20 +362,17 @@ void ANN(parlay::sequence<vtx> &v, int k, int rounds,
               T.tree.reset();
               v2 =
                   parlay::tabulate(n, [&](size_t i) -> vtx * { return &v[i]; });
-              vin2 = parlay::tabulate(
-                  sz, [&](size_t i) -> vtx * { return &vin[i]; });
-              allv = parlay::append(v2, vin2);
-              whole_box = knn_tree::o_tree::get_box(allv);
-              //* warning not the same as others
-              T = knn_tree(allv, whole_box);
-              dims = vin2[0]->pt.dimension();
+              whole_box = knn_tree::o_tree::get_box(v2);
+              T = knn_tree(v2, whole_box);
+
+              dims = v2[0]->pt.dimension();
               root = T.tree.get();
               bd = T.get_box_delta(dims);
             },
             [&]() {
-              vin2 = parlay::tabulate(
-                  sz, [&](size_t i) -> vtx * { return &vin[i]; });
-              T.batch_delete(vin2, root, bd.first, bd.second);
+              v2 = parlay::tabulate(sz,
+                                    [&](size_t i) -> vtx * { return &v[i]; });
+              T.batch_delete(v2, root, bd.first, bd.second);
             },
             [&]() { T.tree.reset(); });
         std::cout << aveDelete << " " << std::flush;

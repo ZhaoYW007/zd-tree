@@ -76,7 +76,7 @@ void timeNeighbors(parlay::sequence<point> &pts, int k, int rounds,
     });
   } else {
     // WARN: needs to recalculate before new test
-    pin2 = parlay::tabulate(pin.size() * 0.5, [&](size_t i) -> vtx {
+    pin2 = parlay::tabulate(pin.size(), [&](size_t i) -> vtx {
       return vtx(pin[i], i + vv.size());
     });
   }
