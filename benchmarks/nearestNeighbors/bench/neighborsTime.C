@@ -62,47 +62,15 @@ void timeNeighbors(parlay::sequence<point> &pts, int k, int rounds,
   int dimensions = pts[0].dimension();
   auto vv =
       parlay::tabulate(n, [&](size_t i) -> vtx { return vtx(pts[i], i); });
-
+  pts.clear();
   parlay::sequence<point>().swap(pts);
 
-  // auto v = parlay::tabulate( n, [&]( size_t i ) -> vtx* { return &vv[i]; } );
-
-  // std::cout << pts.size() << " " << pin.size() << std::flush;
-  parlay::sequence<vtx> pin2;
-
-  if (tag == 2) {
-    pin2 = parlay::tabulate(pin.size() * 0.2, [&](size_t i) -> vtx {
-      return vtx(pin[i], i + vv.size());
-    });
-  } else {
-    // WARN: needs to recalculate before new test
-    pin2 = parlay::tabulate(pin.size(), [&](size_t i) -> vtx {
-      return vtx(pin[i], i + vv.size());
-    });
-  }
-
+  parlay::sequence<vtx> pin2 = parlay::tabulate(
+      pin.size(), [&](size_t i) -> vtx { return vtx(pin[i], i + vv.size()); });
+  pin.clear();
   parlay::sequence<point>().swap(pin);
-  // auto vin = parlay::tabulate( pin.size(),
-  //                              [&]( size_t i ) -> vtx* { return &pin2[i]; }
-  //                              );
-
-  //! cannot remove these two vectors
-  //! since it uses pointers for tree
-  // decltype( vv )().swap( vv );
-  // decltype( pin2 )().swap( pin2 );
 
   ANN<maxK>(vv, k, rounds, pin2, tag, queryType);
-
-  // if( outFile != NULL ) {
-  //   int m = n * k;
-  //   parlay::sequence<int> Pout( m );
-  //   parlay::parallel_for( 0, n - 1, [&]( size_t i ) {
-  //     for( int j = 0; j < k; j++ ) {
-  //       Pout[k * i + j] = ( v[i]->ngh[j] )->identifier;
-  //     }
-  //   } );
-  //   writeIntSeqToFile( Pout, outFile );
-  // }
 }
 
 template <class Point> parlay::sequence<Point> readGeneral(char const *fname) {
@@ -151,10 +119,13 @@ int main(int argc, char *argv[]) {
       PInsert = readGeneral<point2>(insertFile.c_str());
     }
 
-    if (k == 1)
-      timeNeighbors<1>(PIn, 1, rounds, oFile, PInsert, tag, queryType);
-    else
+    if (k == 1) {
+      timeNeighbors<1>(PIn, k, rounds, oFile, PInsert, tag, queryType);
+    } else if (k == 10) {
+      timeNeighbors<10>(PIn, k, rounds, oFile, PInsert, tag, queryType);
+    } else {
       timeNeighbors<100>(PIn, k, rounds, oFile, PInsert, tag, queryType);
+    }
   }
 
   if (d == 3) {
@@ -174,7 +145,9 @@ int main(int argc, char *argv[]) {
     }
 
     if (k == 1)
-      timeNeighbors<1>(PIn, 1, rounds, oFile, PInsert, tag, queryType);
+      timeNeighbors<1>(PIn, k, rounds, oFile, PInsert, tag, queryType);
+    else if (k == 10)
+      timeNeighbors<10>(PIn, k, rounds, oFile, PInsert, tag, queryType);
     else
       timeNeighbors<100>(PIn, k, rounds, oFile, PInsert, tag, queryType);
   }
