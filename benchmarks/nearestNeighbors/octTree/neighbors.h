@@ -39,9 +39,9 @@ int algorithm_version = 0;
 #include "parlay/primitives.h"
 #include "parlay/random.h"
 
-static constexpr size_t batchQUerySize = 1000000;
+static constexpr size_t batchQUerySize = 1e7;
 static constexpr int rangeQueryNum = 100;
-static constexpr double batchInsertRatio = 0.1;
+static constexpr double batchInsertRatio = 0.001;
 
 //* export LD_PRELOAD=/usr/local/lib/libjemalloc.so.2 *//
 
@@ -314,9 +314,9 @@ void ANN(parlay::sequence<vtx> &v, int k, int rounds,
     }
 
     if (queryType & (1 << 4)) { // NOTE: batch insertion with fraction
-      // double ratios[10] = {0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0};
-      const parlay::sequence<double> ratios = {0.01, 0.02, 0.05, 0.1,
-                                               0.2,  0.5,  1.0};
+      const parlay::sequence<double> ratios = {
+          0.0001, 0.0002, 0.0005, 0.001, 0.002, 0.005, 0.01,
+          0.02,   0.05,   0.1,    0.2,   0.5,   1.0};
       for (int i = 0; i < ratios.size(); i++) {
         size_t sz = size_t(v.size() * ratios[i]);
 
@@ -346,9 +346,9 @@ void ANN(parlay::sequence<vtx> &v, int k, int rounds,
     }
 
     if (queryType & (1 << 5)) { // NOTE: batch deletion with fraction
-      const parlay::sequence<double> ratios = {0.01, 0.02, 0.05, 0.1,
-                                               0.2,  0.5,  1.0};
-      // double ratios[10] = {0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0};
+      const parlay::sequence<double> ratios = {
+          0.0001, 0.0002, 0.0005, 0.001, 0.002, 0.005, 0.01,
+          0.02,   0.05,   0.1,    0.2,   0.5,   1.0};
       for (int i = 0; i < ratios.size(); i++) {
         size_t sz = size_t(v.size() * ratios[i]);
         if (i == ratios.size() - 1)
