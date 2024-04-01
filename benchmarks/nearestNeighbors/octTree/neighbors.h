@@ -39,7 +39,7 @@ int algorithm_version = 0;
 #include "parlay/primitives.h"
 #include "parlay/random.h"
 
-static constexpr size_t batchQUerySize = 1e7;
+static constexpr double batchQueryRatio = 0.01;
 static constexpr int rangeQueryNum = 100;
 static constexpr double batchInsertRatio = 0.001;
 
@@ -194,15 +194,14 @@ void ANN(parlay::sequence<vtx> &v, int k, int rounds,
 
     parlay::sequence<size_t> visNodeNum(n, 0);
     if (queryType & (1 << 0)) { //* KNN
-      auto run_zdtree_knn = [&](int kth) {
+      auto run_zdtree_knn = [&](int kth, size_t batchSize) {
+        parlay::sequence<vtx *> vr = parlay::tabulate(
+            batchSize, [&](size_t i) -> vtx * { return &v[i]; });
         auto aveQuery = time_loop(
             rounds, 1.0, [&]() {},
             [&]() {
               if (algorithm_version == 0) {
-                parlay::sequence<vtx *> vr = T.vertices();
-                // find nearest nk neighbors for each point
-                //  vr = T.vertices();
-                //  vr = parlay::random_shuffle( vr.cut( 0, vr.size() ) );
+                // parlay::sequence<vtx *> vr = T.vertices();
                 size_t n = vr.size();
                 parlay::parallel_for(0, n, [&](size_t i) {
                   T.k_nearest(vr[i], kth);
@@ -214,17 +213,18 @@ void ANN(parlay::sequence<vtx> &v, int k, int rounds,
             },
             [&]() {});
         std::cout << aveQuery << " " << T.tree.get()->depth() << " "
-                  << parlay::reduce(visNodeNum) / T.tree.get()->size() << " "
+                  << parlay::reduce(visNodeNum) / batchSize << " "
                   << std::flush;
       };
 
+      size_t batchSize = static_cast<size_t>(v.size() * batchQueryRatio);
       if (tag == 0) {
         int K[3] = {1, 10, 100};
         for (int i = 0; i < 3; i++) {
-          run_zdtree_knn(K[i]);
+          run_zdtree_knn(K[i], batchSize);
         }
       } else {
-        run_zdtree_knn(k);
+        run_zdtree_knn(k, batchSize);
       }
     }
 
@@ -248,16 +248,21 @@ void ANN(parlay::sequence<vtx> &v, int k, int rounds,
               }
             },
             [&]() {});
-        std::cout << aveQuery << " " << std::flush;
+        std::cout << aveQuery << " " << T.tree.get()->depth() << " "
+                  << parlay::reduce(visNodeNum) / T.tree.get()->size() << " "
+                  << std::flush;
+        // std::cout << aveQuery << " " << std::flush;
       };
 
-      std::vector<double> ratios = {0.001, 0.01, 0.1, 0.2, 0.5};
-      for (auto r : ratios) {
-        run_batch_knn(k, v, r);
-      }
-      for (auto r : ratios) {
-        run_batch_knn(k, vin, r);
-      }
+      run_batch_knn(k, v, batchQueryRatio);
+
+      // std::vector<double> ratios = {0.001, 0.01, 0.1, 0.2, 0.5};
+      // for (auto r : ratios) {
+      //   run_batch_knn(k, v, r);
+      // }
+      // for (auto r : ratios) {
+      //   run_batch_knn(k, vin, r);
+      // }
     }
 
     // TODO rewrite range count
