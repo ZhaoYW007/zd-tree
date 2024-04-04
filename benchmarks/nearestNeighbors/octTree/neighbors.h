@@ -94,13 +94,7 @@ void ANN(parlay::sequence<vtx> &v, int k, int rounds,
     //* batch-dynamic insertion
     if (tag >= 1) {
       size_t sz;
-      // if (v.size() == 1000000000) {
-      sz = vin.size();
-      // std::cout << sz << std::endl << std::flush;
-      // } else {
-      //   sz = vin.size() * batchInsertRatio;
-      //   std::cout << sz << std::endl << std::flush;
-      // }
+      sz = static_cast<size_t>(vin.size() * batchInsertRatio);
 
       double aveInsert = time_loop(
           rounds, 1.0,
@@ -142,54 +136,30 @@ void ANN(parlay::sequence<vtx> &v, int k, int rounds,
 
     if (tag >= 2) {
       size_t sz;
-      // if (v.size() == 1000000000) {
-      sz = vin.size();
-      // } else {
-      //   sz = vin.size() * batchInsertRatio;
-      // }
+      sz = static_cast<size_t>(vin.size() * batchInsertRatio);
       double aveDelete = time_loop(
           rounds, 1.0,
           [&]() {
             T.tree.reset();
             v2 = parlay::tabulate(n, [&](size_t i) -> vtx * { return &v[i]; });
-            // vin2 =
-            //     parlay::tabulate( n, [&]( size_t i ) -> vtx* { return
-            //     &vin[i]; } );
-            // allv = parlay::append( v2, vin2 );
-            // whole_box = knn_tree::o_tree::get_box( allv );
             whole_box = knn_tree::o_tree::get_box(v2);
-            //* warning not the same as others
-            //  T = knn_tree(allv, whole_box);
             T = knn_tree(v2, whole_box);
 
             dims = v2[0]->pt.dimension();
             root = T.tree.get();
             bd = T.get_box_delta(dims);
-            //  T.batch_insert( vin2, root, bd.first, bd.second );
           },
           [&]() {
-            // vin2 = parlay::tabulate(sz, [&](size_t i) -> vtx* { return
-            // &vin[i]; });
             v2 = parlay::tabulate(sz, [&](size_t i) -> vtx * { return &v[i]; });
             T.batch_delete(v2, root, bd.first, bd.second);
-            // LOG << T.tree.get()->size() << ENDL;
           },
           [&]() { T.tree.reset(); });
       std::cout << aveDelete << " " << std::flush;
 
       T.tree.reset();
       v2 = parlay::tabulate(n, [&](size_t i) -> vtx * { return &v[i]; });
-      // vin2 = parlay::tabulate( sz, [&]( size_t i ) -> vtx* { return &vin[i];
-      // } ); allv = parlay::append( v2, vin2 );
       whole_box = knn_tree::o_tree::get_box(v2);
-      //* warning not the same as others
-      // T = knn_tree(allv, whole_box);
       T = knn_tree(v2, whole_box); // NOTE: remove delete
-      // dims = v2[0]->pt.dimension();
-      // root = T.tree.get();
-      // bd = T.get_box_delta(dims);
-      // v2 = parlay::tabulate(sz, [&](size_t i) -> vtx * { return &v[i]; });
-      // T.batch_delete(v2, root, bd.first, bd.second);
     }
 
     parlay::sequence<size_t> visNodeNum(n, 0);
