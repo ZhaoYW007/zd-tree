@@ -50,7 +50,8 @@ static constexpr double batchInsertRatio = 0.01;
 // places pointers to them in the .ngh field of each vertex
 template <int max_k, class vtx>
 void ANN(parlay::sequence<vtx> &v, int k, int rounds,
-         parlay::sequence<vtx> &vin, int tag, int queryType) {
+         parlay::sequence<vtx> &vin, int tag, int queryType,
+         const int summary) {
   //  timer t( "ANN", report_stats );
 
   {
@@ -80,87 +81,108 @@ void ANN(parlay::sequence<vtx> &v, int k, int rounds,
         },
         [&]() { T.tree.reset(); });
 
-    //* restore
     v2 = parlay::tabulate(n, [&](size_t i) -> vtx * { return &v[i]; });
     whole_box = knn_tree::o_tree::get_box(v2);
     T = knn_tree(v2, whole_box);
 
     std::cout << aveBuild << " " << T.tree.get()->depth() << " " << std::flush;
-    // prelims for insert/delete
+
     int dims;
     node *root;
     box_delta bd;
-    // parlay::sequence<vtx*> vin2 = parlay::sequence<vtx*>( vin.size() );
 
     //* batch-dynamic insertion
     if (tag >= 1) {
-      size_t sz;
-      sz = static_cast<size_t>(vin.size() * batchInsertRatio);
+      auto zdtree_batch_insert = [&](double r) {
+        size_t sz;
+        sz = static_cast<size_t>(vin.size() * r);
 
-      double aveInsert = time_loop(
-          rounds, 1.0,
-          [&]() {
-            T.tree.reset();
-            v2 = parlay::tabulate(n, [&](size_t i) -> vtx * { return &v[i]; });
-            vin2 = parlay::tabulate(sz,
-                                    [&](size_t i) -> vtx * { return &vin[i]; });
-            allv = parlay::append(v2, vin2);
-            whole_box = knn_tree::o_tree::get_box(allv);
-            T = knn_tree(v2, whole_box);
-          },
-          [&]() {
-            vin2 = parlay::tabulate(sz,
-                                    [&](size_t i) -> vtx * { return &vin[i]; });
-            dims = vin2[0]->pt.dimension();
-            root = T.tree.get();
-            bd = T.get_box_delta(dims);
+        double aveInsert = time_loop(
+            rounds, 1.0,
+            [&]() {
+              T.tree.reset();
+              v2 =
+                  parlay::tabulate(n, [&](size_t i) -> vtx * { return &v[i]; });
+              vin2 = parlay::tabulate(
+                  sz, [&](size_t i) -> vtx * { return &vin[i]; });
+              allv = parlay::append(v2, vin2);
+              whole_box = knn_tree::o_tree::get_box(allv);
+              T = knn_tree(v2, whole_box);
+            },
+            [&]() {
+              vin2 = parlay::tabulate(
+                  sz, [&](size_t i) -> vtx * { return &vin[i]; });
+              dims = vin2[0]->pt.dimension();
+              root = T.tree.get();
+              bd = T.get_box_delta(dims);
 
-            T.batch_insert(vin2, root, bd.first, bd.second);
-          },
-          [&]() { T.tree.reset(); });
-      std::cout << aveInsert << " " << std::flush;
+              T.batch_insert(vin2, root, bd.first, bd.second);
+            },
+            [&]() { T.tree.reset(); });
+        std::cout << aveInsert << " " << std::flush;
 
-      //* restore
-      T.tree.reset();
-      v2 = parlay::tabulate(n, [&](size_t i) -> vtx * { return &v[i]; });
-      vin2 = parlay::tabulate(sz, [&](size_t i) -> vtx * { return &vin[i]; });
-      allv = parlay::append(v2, vin2);
-      whole_box = knn_tree::o_tree::get_box(allv);
-      T = knn_tree(v2, whole_box);
-      dims = vin2[0]->pt.dimension();
-      root = T.tree.get();
-      bd = T.get_box_delta(dims);
-      T.batch_insert(vin2, root, bd.first, bd.second);
-      //! no need to append vin since KNN graph always get points from the
-      //! tree
+        //* restore
+        // T.tree.reset();
+        // v2 = parlay::tabulate(n, [&](size_t i) -> vtx * { return &v[i]; });
+        // vin2 = parlay::tabulate(sz, [&](size_t i) -> vtx * { return &vin[i];
+        // }); allv = parlay::append(v2, vin2); whole_box =
+        // knn_tree::o_tree::get_box(allv); T = knn_tree(v2, whole_box); dims =
+        // vin2[0]->pt.dimension(); root = T.tree.get(); bd =
+        // T.get_box_delta(dims); T.batch_insert(vin2, root, bd.first,
+        // bd.second);
+        //! no need to append vin since KNN graph always get points from the
+        //! tree
+      };
+
+      if (summary) {
+        const parlay::sequence<double> ratios = {0.0001, 0.001, 0.01, 0.1};
+        for (int i = 0; i < ratios.size(); i++) {
+          zdtree_batch_insert(ratios[i]);
+        }
+      } else {
+        zdtree_batch_insert(batchInsertRatio);
+      }
     }
 
     if (tag >= 2) {
-      size_t sz;
-      sz = static_cast<size_t>(vin.size() * batchInsertRatio);
-      double aveDelete = time_loop(
-          rounds, 1.0,
-          [&]() {
-            T.tree.reset();
-            v2 = parlay::tabulate(n, [&](size_t i) -> vtx * { return &v[i]; });
-            whole_box = knn_tree::o_tree::get_box(v2);
-            T = knn_tree(v2, whole_box);
+      auto zdtree_batch_delete = [&](double r) {
+        size_t sz;
+        sz = static_cast<size_t>(vin.size() * r);
+        double aveDelete = time_loop(
+            rounds, 1.0,
+            [&]() {
+              T.tree.reset();
+              v2 =
+                  parlay::tabulate(n, [&](size_t i) -> vtx * { return &v[i]; });
+              whole_box = knn_tree::o_tree::get_box(v2);
+              T = knn_tree(v2, whole_box);
 
-            dims = v2[0]->pt.dimension();
-            root = T.tree.get();
-            bd = T.get_box_delta(dims);
-          },
-          [&]() {
-            v2 = parlay::tabulate(sz, [&](size_t i) -> vtx * { return &v[i]; });
-            T.batch_delete(v2, root, bd.first, bd.second);
-          },
-          [&]() { T.tree.reset(); });
-      std::cout << aveDelete << " " << std::flush;
+              dims = v2[0]->pt.dimension();
+              root = T.tree.get();
+              bd = T.get_box_delta(dims);
+            },
+            [&]() {
+              v2 = parlay::tabulate(sz,
+                                    [&](size_t i) -> vtx * { return &v[i]; });
+              T.batch_delete(v2, root, bd.first, bd.second);
+            },
+            [&]() { T.tree.reset(); });
+        std::cout << aveDelete << " " << std::flush;
 
-      T.tree.reset();
-      v2 = parlay::tabulate(n, [&](size_t i) -> vtx * { return &v[i]; });
-      whole_box = knn_tree::o_tree::get_box(v2);
-      T = knn_tree(v2, whole_box); // NOTE: remove delete
+        T.tree.reset();
+        v2 = parlay::tabulate(n, [&](size_t i) -> vtx * { return &v[i]; });
+        whole_box = knn_tree::o_tree::get_box(v2);
+        T = knn_tree(v2, whole_box);
+      };
+
+      if (summary) {
+        const parlay::sequence<double> ratios = {0.0001, 0.001, 0.01, 0.1};
+        for (int i = 0; i < ratios.size(); i++) {
+          zdtree_batch_delete(ratios[i]);
+        }
+      } else {
+        zdtree_batch_delete(batchInsertRatio);
+      }
     }
 
     parlay::sequence<size_t> visNodeNum(n, 0);
@@ -189,7 +211,7 @@ void ANN(parlay::sequence<vtx> &v, int k, int rounds,
       };
 
       size_t batchSize = static_cast<size_t>(v.size() * batchQueryRatio);
-      if (tag == 0) {
+      if (summary == 0) {
         int K[3] = {1, 10, 100};
         for (int i = 0; i < 3; i++) {
           run_zdtree_knn(K[i], batchSize);
@@ -270,19 +292,18 @@ void ANN(parlay::sequence<vtx> &v, int k, int rounds,
       //     rounds, 1.0, [&]() {},
       //     [&]() {
       //       for( int i = 0; i < 10; i++ ) {
-      //         parlay::sequence<vtx*> pts{ v[i], v[( i + size / 2 ) % size] };
-      //         box queryBox = knn_tree::o_tree::get_box( pts );
-      //         int dims = ( v[0]->pt ).dimension();
-      //         box_delta bd = T.get_box_delta( dims );
-      //         T.range_count( T.tree.get(), queryBox, 1e-7 );
+      //         parlay::sequence<vtx*> pts{ v[i], v[( i + size / 2 ) % size]
+      //         }; box queryBox = knn_tree::o_tree::get_box( pts ); int dims
+      //         = ( v[0]->pt ).dimension(); box_delta bd = T.get_box_delta(
+      //         dims ); T.range_count( T.tree.get(), queryBox, 1e-7 );
       //         T.range_query( T.tree.get(),
-      //                        Out.cut( 0, T.tree.get()->get_aug() ), queryBox,
-      //                        1e-7 );
+      //                        Out.cut( 0, T.tree.get()->get_aug() ),
+      //                        queryBox, 1e-7 );
       //         //  std::cout << T.tree.get()->get_aug() << std::endl;
       //       }
       //     },
       //     [&]() {} );
-      if (tag == 0) {
+      if (summary == 0) {
         std::cout << "-1 -1 -1 " << std::flush;
       } else {
         std::cout << "-1 " << std::flush;

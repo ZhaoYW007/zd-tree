@@ -56,7 +56,7 @@ template <class PT, int KK> struct vertex {
 template <int maxK, class point>
 void timeNeighbors(parlay::sequence<point> &pts, int k, int rounds,
                    char *outFile, parlay::sequence<point> &pin, int tag,
-                   int queryType) {
+                   int queryType, const int summary) {
   size_t n = pts.size();
   using vtx = vertex<point, maxK>;
   int dimensions = pts[0].dimension();
@@ -70,7 +70,7 @@ void timeNeighbors(parlay::sequence<point> &pts, int k, int rounds,
   pin.clear();
   parlay::sequence<point>().swap(pin);
 
-  ANN<maxK>(vv, k, rounds, pin2, tag, queryType);
+  ANN<maxK>(vv, k, rounds, pin2, tag, queryType, summary);
 }
 
 template <class Point> parlay::sequence<Point> readGeneral(char const *fname) {
@@ -84,7 +84,8 @@ template <class Point> parlay::sequence<Point> readGeneral(char const *fname) {
 int main(int argc, char *argv[]) {
   commandLine P(argc, argv,
                 "[-k {1,...,100}] [-d {2,3}] [-o <outFile>] [-r <rounds>] "
-                "[-p <inFile>] [-t <tag>] [-q <queryType>] [-i <insertFile>]");
+                "[-p <inFile>] [-t <tag>] [-q <queryType>] [-i <insertFile>] "
+                "[-s <summary>]");
   char *iFile = P.getOptionValue("-p");
   char *oFile = P.getOptionValue("-o");
   int rounds = P.getOptionIntValue("-r", 3);
@@ -93,6 +94,8 @@ int main(int argc, char *argv[]) {
   int tag = P.getOptionIntValue("-t", 0);
   int queryType = P.getOptionIntValue("-q", 0);
   int readInsertFile = P.getOptionIntValue("-i", 1);
+  int summary = P.getOptionIntValue("-s", 0);
+
   //  algorithm_version = P.getOptionIntValue( "-t", algorithm_version );
   if (k < 1 || k > 100)
     P.badArgument();
@@ -120,11 +123,13 @@ int main(int argc, char *argv[]) {
     }
 
     if (k == 1) {
-      timeNeighbors<1>(PIn, k, rounds, oFile, PInsert, tag, queryType);
+      timeNeighbors<1>(PIn, k, rounds, oFile, PInsert, tag, queryType, summary);
     } else if (k == 10) {
-      timeNeighbors<10>(PIn, k, rounds, oFile, PInsert, tag, queryType);
+      timeNeighbors<10>(PIn, k, rounds, oFile, PInsert, tag, queryType,
+                        summary);
     } else {
-      timeNeighbors<100>(PIn, k, rounds, oFile, PInsert, tag, queryType);
+      timeNeighbors<100>(PIn, k, rounds, oFile, PInsert, tag, queryType,
+                         summary);
     }
   }
 
@@ -145,10 +150,12 @@ int main(int argc, char *argv[]) {
     }
 
     if (k == 1)
-      timeNeighbors<1>(PIn, k, rounds, oFile, PInsert, tag, queryType);
+      timeNeighbors<1>(PIn, k, rounds, oFile, PInsert, tag, queryType, summary);
     else if (k == 10)
-      timeNeighbors<10>(PIn, k, rounds, oFile, PInsert, tag, queryType);
+      timeNeighbors<10>(PIn, k, rounds, oFile, PInsert, tag, queryType,
+                        summary);
     else
-      timeNeighbors<100>(PIn, k, rounds, oFile, PInsert, tag, queryType);
+      timeNeighbors<100>(PIn, k, rounds, oFile, PInsert, tag, queryType,
+                         summary);
   }
 }
