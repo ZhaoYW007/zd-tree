@@ -41,7 +41,8 @@ int algorithm_version = 0;
 
 static constexpr double batchQueryRatio = 0.01;
 static constexpr int rangeQueryNum = 100;
-static constexpr double batchInsertRatio = 0.001;
+// static constexpr double batchInsertRatio = 0.001;
+static constexpr double batchInsertRatio = 0.01;
 
 //* export LD_PRELOAD=/usr/local/lib/libjemalloc.so.2 *//
 
