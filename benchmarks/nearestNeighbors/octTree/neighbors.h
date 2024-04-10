@@ -607,7 +607,7 @@ void ANN(parlay::sequence<vtx> &v, int k, int rounds, parlay::sequence<vtx> &vin
 
             // NOTE: begin knn
             auto aveQuery = time_loop(
-                rounds, 1.0, [&]() {},
+                rounds, -1.0, [&]() {},  // NOTE: too long, only run once
                 [&]() {
                     if (algorithm_version == 0) {
                         parlay::sequence<vtx *> vr = T.vertices();
@@ -625,7 +625,7 @@ void ANN(parlay::sequence<vtx> &v, int k, int rounds, parlay::sequence<vtx> &vin
                       << " " << std::flush;
         }
 
-        if (queryType & (1 << 11)) {  // NOTE: by month
+        if (queryType & (1 << 12)) {  // NOTE: by month
             LOG << ENDL;
             string osm_prefix = "/data/zmen002/kdtree/real_world/osm/month/";
             const std::vector<std::string> files = {"2014", "2015", "2016", "2017", "2018",
@@ -651,7 +651,7 @@ void ANN(parlay::sequence<vtx> &v, int k, int rounds, parlay::sequence<vtx> &vin
 
             // NOTE: begin knn
             auto aveQuery = time_loop(
-                rounds, 1.0, [&]() {},
+                rounds, -1.0, [&]() {},  // NOTE: too long, only run once
                 [&]() {
                     if (algorithm_version == 0) {
                         parlay::sequence<vtx *> vr = T.vertices();
