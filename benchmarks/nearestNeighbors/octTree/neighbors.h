@@ -575,9 +575,13 @@ void ANN(parlay::sequence<vtx> &v, int k, int rounds, parlay::sequence<vtx> &vin
 
                 wp[i] =
                     parlay::tabulate(node_by_time[i].size(), [&](size_t j) -> vtx * { return &node_by_time[i][j]; });
+                // t.next("get_address");
+
                 dims = wp[i][0]->pt.dimension();
                 root = T.tree.get();
                 bd = T.get_box_delta(dims);
+                // t.next("get_box_delta");
+
                 T.batch_insert(wp[i], root, bd.first, bd.second);
 
                 t.stop();
@@ -611,8 +615,10 @@ void ANN(parlay::sequence<vtx> &v, int k, int rounds, parlay::sequence<vtx> &vin
                 [&]() {
                     if (algorithm_version == 0) {
                         parlay::sequence<vtx *> vr = T.vertices();
-                        // size_t n = vr.size();
+                        // LOG << k << " " << vr.size() << ENDL;
+                        size_t n = vr.size();
                         parlay::parallel_for(0, n, [&](size_t i) {
+                            // if (i % 1000000 == 0) LOG << i << ENDL;
                             T.k_nearest(vr[i], k);
                             visNodeNum[i] = vr[i]->counter + vr[i]->counter2;
                         });
@@ -655,7 +661,7 @@ void ANN(parlay::sequence<vtx> &v, int k, int rounds, parlay::sequence<vtx> &vin
                 [&]() {
                     if (algorithm_version == 0) {
                         parlay::sequence<vtx *> vr = T.vertices();
-                        // size_t n = vr.size();
+                        size_t n = vr.size();
                         parlay::parallel_for(0, n, [&](size_t i) {
                             T.k_nearest(vr[i], k);
                             visNodeNum[i] = vr[i]->counter + vr[i]->counter2;
