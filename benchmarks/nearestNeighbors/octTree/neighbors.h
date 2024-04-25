@@ -544,6 +544,10 @@ void ANN(parlay::sequence<vtx> &v, int k, int rounds, parlay::sequence<vtx> &vin
                                    parlay::sequence<vtx *> &all_points, int time_period_num) {
             parlay::sequence<parlay::sequence<vtx *>> wp(time_period_num);
 
+            wp[0] = parlay::tabulate(node_by_time[0].size(), [&](size_t j) -> vtx * { return &node_by_time[0][j]; });
+            auto whole_box = knn_tree::o_tree::get_box(all_points);
+            T = knn_tree(wp[0], whole_box);
+
             double aveInsert = time_loop(
                 rounds, 1.0, [&]() { T.tree.reset(); },
                 [&]() {
@@ -563,24 +567,29 @@ void ANN(parlay::sequence<vtx> &v, int k, int rounds, parlay::sequence<vtx> &vin
                 [&]() { T.tree.reset(); });
 
             parlay::internal::timer t;
+            T.tree.reset();
             t.reset(), t.start();
             wp[0] = parlay::tabulate(node_by_time[0].size(), [&](size_t j) -> vtx * { return &node_by_time[0][j]; });
             auto wbox = knn_tree::o_tree::get_box(all_points);
+            // auto tmp = parlay::tabulate(all_points.size() - 209209185, [&](size_t i) { return all_points[i]; });
+            // T = knn_tree(tmp, wbox);
             T = knn_tree(wp[0], wbox);
             t.stop();
-            LOG << node_by_time[0].size() << " " << t.total_time() << ENDL;
+            LOG << wp[0].size() << " " << t.total_time() << ENDL;
+            // LOG << "tmp size" << tmp.size() << " tree size ";
+            // LOG << T.tree->size() << " " << T.tree.get()->depth() << " " << t.total_time() << ENDL;
+            // LOG << T.tree.get()->is_leaf() << " " << T.tree.get()->Left()->is_leaf() << " "
+            //     << T.tree.get()->Right()->is_leaf() << ENDL;
 
             for (int i = 1; i < time_period_num; i++) {
                 t.reset(), t.start();
 
                 wp[i] =
                     parlay::tabulate(node_by_time[i].size(), [&](size_t j) -> vtx * { return &node_by_time[i][j]; });
-                // t.next("get_address");
 
                 dims = wp[i][0]->pt.dimension();
                 root = T.tree.get();
                 bd = T.get_box_delta(dims);
-                // t.next("get_box_delta");
 
                 T.batch_insert(wp[i], root, bd.first, bd.second);
 
@@ -645,10 +654,11 @@ void ANN(parlay::sequence<vtx> &v, int k, int rounds, parlay::sequence<vtx> &vin
                 for (int k = 0; k < month.size(); k++) {
                     std::string path = osm_prefix + files[i] + "/" + month[k] + ".csv";
                     auto pts = readGeneral<vpoint>(path.c_str());
-                    node_by_year[i * month.size() + k] =
+                    int month_pos = i * month.size() + k;
+                    node_by_year[month_pos] =
                         parlay::tabulate(pts.size(), [&](size_t j) -> vtx { return vtx(pts[j], j); });
-                    star_node_by_year[i * month.size() + k] =
-                        parlay::tabulate(pts.size(), [&](size_t j) -> vtx * { return &node_by_year[i][j]; });
+                    star_node_by_year[month_pos] =
+                        parlay::tabulate(pts.size(), [&](size_t j) -> vtx * { return &node_by_year[month_pos][j]; });
                 }
             }
 
@@ -660,7 +670,8 @@ void ANN(parlay::sequence<vtx> &v, int k, int rounds, parlay::sequence<vtx> &vin
                 rounds, -1.0, [&]() {},  // NOTE: too long, only run once
                 [&]() {
                     if (algorithm_version == 0) {
-                        parlay::sequence<vtx *> vr = T.vertices();
+                        // parlay::sequence<vtx *> vr = T.vertices();
+                        auto vr = star_all;  // WARN: cannot move it outside otherwise segfault
                         size_t n = vr.size();
                         parlay::parallel_for(0, n, [&](size_t i) {
                             T.k_nearest(vr[i], k);
