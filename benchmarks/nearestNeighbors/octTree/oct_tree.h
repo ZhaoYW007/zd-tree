@@ -267,6 +267,18 @@ struct oct_tree {
             }
         }
 
+        void get_leaf_info(size_t &idx, node *T, size_t depth, parlay::sequence<int> &size_arr,
+                           parlay::sequence<int> &depth_arr) {
+            if (T->is_leaf()) {
+                size_arr[idx] = T->size();
+                depth_arr[idx++] = depth;
+                return;
+            }
+            get_leaf_info(idx, T->Left(), depth + 1, size_arr, depth_arr);
+            get_leaf_info(idx, T->Right(), depth + 1, size_arr, depth_arr);
+            return;
+        }
+
         // recursively frees the tree
         static void delete_tree(node *T) {
             if (T != nullptr) {

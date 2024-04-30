@@ -20,6 +20,7 @@
 // OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
 // WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
+#include "parlay/internal/group_by.h"
 bool report_stats = true;
 int algorithm_version = 0;
 // 0=root based, 1=bit based, >2=map based
@@ -548,56 +549,105 @@ void ANN(parlay::sequence<vtx> &v, int k, int rounds, parlay::sequence<vtx> &vin
             auto whole_box = knn_tree::o_tree::get_box(all_points);
             T = knn_tree(wp[0], whole_box);
 
-            double aveInsert = time_loop(
-                rounds, 1.0, [&]() { T.tree.reset(); },
-                [&]() {
-                    wp[0] = parlay::tabulate(node_by_time[0].size(),
-                                             [&](size_t j) -> vtx * { return &node_by_time[0][j]; });
-                    auto whole_box = knn_tree::o_tree::get_box(all_points);
-                    T = knn_tree(wp[0], whole_box);
-                    for (int i = 1; i < time_period_num; i++) {
-                        wp[i] = parlay::tabulate(node_by_time[i].size(),
-                                                 [&](size_t j) -> vtx * { return &node_by_time[i][j]; });
-                        dims = wp[i][0]->pt.dimension();
-                        root = T.tree.get();
-                        bd = T.get_box_delta(dims);
-                        T.batch_insert(wp[i], root, bd.first, bd.second);
-                    }
-                },
-                [&]() { T.tree.reset(); });
+            // double aveInsert = time_loop(
+            //     rounds, 1.0, [&]() { T.tree.reset(); },
+            //     [&]() {
+            //         wp[0] = parlay::tabulate(node_by_time[0].size(),
+            //                                  [&](size_t j) -> vtx * { return &node_by_time[0][j]; });
+            //         auto whole_box = knn_tree::o_tree::get_box(all_points);
+            //         T = knn_tree(wp[0], whole_box);
+            //         for (int i = 1; i < time_period_num; i++) {
+            //             wp[i] = parlay::tabulate(node_by_time[i].size(),
+            //                                      [&](size_t j) -> vtx * { return &node_by_time[i][j]; });
+            //             dims = wp[i][0]->pt.dimension();
+            //             root = T.tree.get();
+            //             bd = T.get_box_delta(dims);
+            //             T.batch_insert(wp[i], root, bd.first, bd.second);
+            //         }
+            //     },
+            //     [&]() { T.tree.reset(); });
 
             parlay::internal::timer t;
             T.tree.reset();
             t.reset(), t.start();
-            wp[0] = parlay::tabulate(node_by_time[0].size(), [&](size_t j) -> vtx * { return &node_by_time[0][j]; });
+            // wp[0] = parlay::tabulate(node_by_time[0].size(), [&](size_t j) -> vtx * { return &node_by_time[0][j]; });
+            wp[0] = parlay::tabulate(node_by_time[0].size() + node_by_time[1].size(),
+                                     [&](size_t i) { return all_points[i]; });
             auto wbox = knn_tree::o_tree::get_box(all_points);
-            // auto tmp = parlay::tabulate(all_points.size() - 209209185, [&](size_t i) { return all_points[i]; });
-            // T = knn_tree(tmp, wbox);
             T = knn_tree(wp[0], wbox);
             t.stop();
-            LOG << wp[0].size() << " " << t.total_time() << ENDL;
-            // LOG << "tmp size" << tmp.size() << " tree size ";
-            // LOG << T.tree->size() << " " << T.tree.get()->depth() << " " << t.total_time() << ENDL;
-            // LOG << T.tree.get()->is_leaf() << " " << T.tree.get()->Left()->is_leaf() << " "
-            //     << T.tree.get()->Right()->is_leaf() << ENDL;
+
+            auto verifyZdtreeInfo = [&]() {
+                size_t idx = 0;
+                parlay::sequence<int> size_arr(T.tree.get()->size(), 0);
+                parlay::sequence<int> depth_arr(T.tree.get()->size(), 0);
+                T.tree.get()->get_leaf_info(idx, T.tree.get(), 1, size_arr, depth_arr);
+                auto size_histo = parlay::histogram_by_key(size_arr.cut(0, idx));
+                auto depth_histo = parlay::histogram_by_key(depth_arr.cut(0, idx));
+                parlay::sort_inplace(size_histo, [&](auto &a, auto &b) { return a.first < b.first; });
+                parlay::sort_inplace(depth_histo, [&](auto &a, auto &b) { return a.first < b.first; });
+                LOG << wp[0].size() << " " << t.total_time() << ENDL;
+                LOG << "tree size: " << ENDL;
+                for (auto i : size_histo) {
+                    LOG << i.first << " " << i.second << ENDL;
+                }
+                LOG << "tree depth: " << ENDL;
+                for (auto i : depth_histo) {
+                    LOG << i.first << " " << i.second << ENDL;
+                }
+                LOG << "--------------------" << ENDL;
+            };
+
+            // NOTE: test the knn time
+            auto zdtreeKNN = [&](const int kth, auto pts) {
+                LOG << ">>> knn: ";
+                // BUG: 100724349
+                auto aveQuery = time_loop(
+                    rounds, -1.0, [&]() {},  // NOTE: too long, only run once
+                    [&]() {
+                        if (algorithm_version == 0) {
+                            // parlay::sequence<vtx *> vr = T.vertices();
+                            // LOG << k << " " << vr.size() << ENDL;
+                            size_t n = pts.size();
+                            // parlay::parallel_for(0, n, [&](size_t i) {
+                            for (int i = 0; i < n; i++) {
+                                LOG << i << ENDL;
+                                T.k_nearest(pts[i], kth);
+                                visNodeNum[i] = pts[i]->counter + pts[i]->counter2;
+                            }
+                            // });
+                        } else if (algorithm_version == 1) {
+                        } else {
+                        }
+                    },
+                    [&]() {});
+                std::cout << aveQuery << " " << T.tree.get()->depth() << " " << parlay::reduce(visNodeNum) / pts.size()
+                          << " " << std::endl
+                          << std::flush;
+            };
+
+            // verifyZdtreeInfo();
+            size_t cnt = wp[0].size();
+            zdtreeKNN(10, all_points.cut(0, cnt));
 
             for (int i = 1; i < time_period_num; i++) {
                 t.reset(), t.start();
-
                 wp[i] =
                     parlay::tabulate(node_by_time[i].size(), [&](size_t j) -> vtx * { return &node_by_time[i][j]; });
-
                 dims = wp[i][0]->pt.dimension();
                 root = T.tree.get();
                 bd = T.get_box_delta(dims);
-
                 T.batch_insert(wp[i], root, bd.first, bd.second);
-
                 t.stop();
                 LOG << node_by_time[i].size() << " " << t.total_time() << ENDL;
+
+                // NOTE: test the knn time
+                verifyZdtreeInfo();
+                cnt += wp[i].size();
+                zdtreeKNN(10, all_points.cut(0, cnt));
             }
 
-            std::cout << aveInsert << " " << T.tree.get()->depth() << " " << "-1 " << std::flush;
+            // std::cout << aveInsert << " " << T.tree.get()->depth() << " " << "-1 " << std::flush;
         };
 
         if (queryType & (1 << 11)) {  // NOTE: by year
@@ -623,11 +673,10 @@ void ANN(parlay::sequence<vtx> &v, int k, int rounds, parlay::sequence<vtx> &vin
                 rounds, -1.0, [&]() {},  // NOTE: too long, only run once
                 [&]() {
                     if (algorithm_version == 0) {
-                        parlay::sequence<vtx *> vr = T.vertices();
-                        // LOG << k << " " << vr.size() << ENDL;
+                        // parlay::sequence<vtx *> vr = T.vertices();
+                        auto vr = star_all;  // WARN: cannot move it outside otherwise segfault
                         size_t n = vr.size();
                         parlay::parallel_for(0, n, [&](size_t i) {
-                            // if (i % 1000000 == 0) LOG << i << ENDL;
                             T.k_nearest(vr[i], k);
                             visNodeNum[i] = vr[i]->counter + vr[i]->counter2;
                         });
