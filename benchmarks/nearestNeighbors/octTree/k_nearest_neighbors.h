@@ -450,7 +450,7 @@ struct k_nearest_neighbors {
         batch_insert0(parlay::make_slice(x), R);
         // timer.next("insert");
         box root_box = o_tree::update_boxes(R);
-        // timer.next("update box");
+        timer.next("update box");
     }
 
     void batch_delete0(slice_t idpts, node* R) {

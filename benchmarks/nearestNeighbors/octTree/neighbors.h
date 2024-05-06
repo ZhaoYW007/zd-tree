@@ -609,13 +609,13 @@ void ANN(parlay::sequence<vtx> &v, int k, int rounds, parlay::sequence<vtx> &vin
                             // parlay::sequence<vtx *> vr = T.vertices();
                             // LOG << k << " " << vr.size() << ENDL;
                             size_t n = pts.size();
-                            // parlay::parallel_for(0, n, [&](size_t i) {
-                            for (int i = 0; i < n; i++) {
-                                LOG << i << ENDL;
+                            parlay::parallel_for(0, n, [&](size_t i) {
+                                // for (int i = 100724349; i < n; i++) {
+                                if (i % 10000 == 0) LOG << i << ENDL;
                                 T.k_nearest(pts[i], kth);
                                 visNodeNum[i] = pts[i]->counter + pts[i]->counter2;
-                            }
-                            // });
+                                // }
+                            });
                         } else if (algorithm_version == 1) {
                         } else {
                         }
@@ -628,7 +628,7 @@ void ANN(parlay::sequence<vtx> &v, int k, int rounds, parlay::sequence<vtx> &vin
 
             // verifyZdtreeInfo();
             size_t cnt = wp[0].size();
-            zdtreeKNN(10, all_points.cut(0, cnt));
+            // zdtreeKNN(10, all_points.cut(0, cnt));
 
             for (int i = 1; i < time_period_num; i++) {
                 t.reset(), t.start();
