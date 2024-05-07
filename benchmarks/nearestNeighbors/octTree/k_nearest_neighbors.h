@@ -22,6 +22,8 @@
 
 int queue_cutoff = 50;
 
+#define LOG  std::cout
+#define ENDL std::endl << std::flush
 #include <math.h>
 
 #include <algorithm>
@@ -450,7 +452,7 @@ struct k_nearest_neighbors {
         batch_insert0(parlay::make_slice(x), R);
         // timer.next("insert");
         box root_box = o_tree::update_boxes(R);
-        timer.next("update box");
+        // timer.next("update box");
     }
 
     void batch_delete0(slice_t idpts, node* R) {
@@ -518,13 +520,34 @@ struct k_nearest_neighbors {
         return true;
     }
 
+    box mergeBox(box& a, box& b) { return box(a.first.minCoords(b.first), a.second.maxCoords(b.second)); }
+
     bool intersect_box(box a, box b, double epsilon) {
         for (int i = 0; i < a.first.dimension(); i++) {
-            if (a.first[i] - epsilon > b.second[i]) {
+            if (a.second[i] - epsilon < b.first[i] || a.first[i] + epsilon > b.second[i]) {
                 return false;
             }
         }
         return true;
+    }
+
+    box verifyBoundindBox(node* T) {
+        if (T->is_leaf()) {
+            auto point_box = o_tree::get_box(T->Vertices());
+            assert(box_within_box(point_box, T->Box(), 1e-9));
+            return point_box;
+        }
+        auto Lbox = verifyBoundindBox(T->Left());
+        auto Rbox = verifyBoundindBox(T->Right());
+        auto merged_box = mergeBox(Lbox, Rbox);
+        assert(box_within_box(merged_box, T->Box(), 1e-9));
+        if (intersect_box(T->Left()->Box(), T->Right()->Box(), 1e-9)) {
+            LOG << ">>>>>>>>> ";
+            LOG << std::setprecision(6) << T->Left()->Box().first << "->" << T->Left()->Box().second << ENDL;
+            LOG << std::setprecision(6) << T->Right()->Box().first << "->" << T->Right()->Box().second << ENDL;
+        }
+        // assert(!intersect_box(T->Left()->Box(), T->Right()->Box(), 1e-9));
+        return merged_box;
     }
 
     void range_count(node* T, box queryBox, double Delta) {

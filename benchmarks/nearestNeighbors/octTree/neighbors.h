@@ -24,8 +24,6 @@
 bool report_stats = true;
 int algorithm_version = 0;
 // 0=root based, 1=bit based, >2=map based
-#define LOG  std::cout
-#define ENDL std::endl << std::flush
 
 #include <math.h>
 
@@ -543,6 +541,7 @@ void ANN(parlay::sequence<vtx> &v, int k, int rounds, parlay::sequence<vtx> &vin
 
         auto insertOsmByTime = [&](parlay::sequence<parlay::sequence<vtx>> &node_by_time,
                                    parlay::sequence<vtx *> &all_points, int time_period_num) {
+            const size_t osm_query_num = 100000;
             parlay::sequence<parlay::sequence<vtx *>> wp(time_period_num);
 
             wp[0] = parlay::tabulate(node_by_time[0].size(), [&](size_t j) -> vtx * { return &node_by_time[0][j]; });
@@ -571,13 +570,12 @@ void ANN(parlay::sequence<vtx> &v, int k, int rounds, parlay::sequence<vtx> &vin
             T.tree.reset();
             t.reset(), t.start();
             // wp[0] = parlay::tabulate(node_by_time[0].size(), [&](size_t j) -> vtx * { return &node_by_time[0][j]; });
-            wp[0] = parlay::tabulate(node_by_time[0].size() + node_by_time[1].size(),
-                                     [&](size_t i) { return all_points[i]; });
+            wp[0] = parlay::tabulate(node_by_time[0].size(), [&](size_t i) { return all_points[i]; });
             auto wbox = knn_tree::o_tree::get_box(all_points);
             T = knn_tree(wp[0], wbox);
             t.stop();
 
-            auto verifyZdtreeInfo = [&]() {
+            auto verifyZdtreeDepthSize = [&]() {
                 size_t idx = 0;
                 parlay::sequence<int> size_arr(T.tree.get()->size(), 0);
                 parlay::sequence<int> depth_arr(T.tree.get()->size(), 0);
@@ -611,7 +609,7 @@ void ANN(parlay::sequence<vtx> &v, int k, int rounds, parlay::sequence<vtx> &vin
                             size_t n = pts.size();
                             parlay::parallel_for(0, n, [&](size_t i) {
                                 // for (int i = 100724349; i < n; i++) {
-                                if (i % 10000 == 0) LOG << i << ENDL;
+                                // if (i % 1000000 == 0) LOG << i << ENDL;
                                 T.k_nearest(pts[i], kth);
                                 visNodeNum[i] = pts[i]->counter + pts[i]->counter2;
                                 // }
@@ -628,7 +626,9 @@ void ANN(parlay::sequence<vtx> &v, int k, int rounds, parlay::sequence<vtx> &vin
 
             // verifyZdtreeInfo();
             size_t cnt = wp[0].size();
-            // zdtreeKNN(10, all_points.cut(0, cnt));
+            // zdtreeKNN(10, all_points.cut(0, osm_query_num));
+            T.verifyBoundindBox(T.tree.get());
+            LOG << "here" << ENDL;
 
             for (int i = 1; i < time_period_num; i++) {
                 t.reset(), t.start();
@@ -642,9 +642,10 @@ void ANN(parlay::sequence<vtx> &v, int k, int rounds, parlay::sequence<vtx> &vin
                 LOG << node_by_time[i].size() << " " << t.total_time() << ENDL;
 
                 // NOTE: test the knn time
-                verifyZdtreeInfo();
+                // verifyZdtreeInfo();
                 cnt += wp[i].size();
-                zdtreeKNN(10, all_points.cut(0, cnt));
+                T.verifyBoundindBox(T.tree.get());
+                // zdtreeKNN(10, all_points.cut(0, osm_query_num));
             }
 
             // std::cout << aveInsert << " " << T.tree.get()->depth() << " " << "-1 " << std::flush;
