@@ -541,11 +541,16 @@ struct k_nearest_neighbors {
         auto Rbox = verifyBoundindBox(T->Right());
         auto merged_box = mergeBox(Lbox, Rbox);
         assert(box_within_box(merged_box, T->Box(), 1e-9));
-        if (intersect_box(T->Left()->Box(), T->Right()->Box(), 1e-9)) {
-            LOG << ">>>>>>>>> ";
-            LOG << std::setprecision(6) << T->Left()->Box().first << "->" << T->Left()->Box().second << ENDL;
-            LOG << std::setprecision(6) << T->Right()->Box().first << "->" << T->Right()->Box().second << ENDL;
+        if (intersect_box(Lbox, Rbox, 1e-9)) {
+            LOG << "<<<<<<<< \n";
+            LOG << std::setprecision(6) << Lbox.first << "->" << Lbox.second << ENDL;
+            LOG << std::setprecision(6) << Rbox.first << "->" << Rbox.second << ENDL;
         }
+        // if (intersect_box(T->Left()->Box(), T->Right()->Box(), 1e-9)) {
+        //     LOG << ">>>>>>>>> ";
+        //     LOG << std::setprecision(6) << T->Left()->Box().first << "->" << T->Left()->Box().second << ENDL;
+        //     LOG << std::setprecision(6) << T->Right()->Box().first << "->" << T->Right()->Box().second << ENDL;
+        // }
         // assert(!intersect_box(T->Left()->Box(), T->Right()->Box(), 1e-9));
         return merged_box;
     }
