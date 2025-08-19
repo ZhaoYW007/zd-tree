@@ -65,9 +65,9 @@ add_executable(zdtree "benchmarks/nearestNeighbors/bench/neighborsTime.C")
 target_include_directories(zdtree PUBLIC "benchmarks/nearestNeighbors/bench/common" "benchmarks/nearestNeighbors/octTree")
 target_link_libraries(zdtree PUBLIC parlay)
 
-add_executable(cknn "benchmarks/nearestNeighbors/bench/neighborsTimeCKNN.C")
-target_include_directories(cknn PUBLIC "benchmarks/nearestNeighbors/bench/common" "benchmarks/nearestNeighbors/CKNN")
-target_link_libraries(cknn PUBLIC parlay)
+# add_executable(cknn "benchmarks/nearestNeighbors/bench/neighborsTimeCKNN.C")
+# target_include_directories(cknn PUBLIC "benchmarks/nearestNeighbors/bench/common" "benchmarks/nearestNeighbors/CKNN")
+# target_link_libraries(cknn PUBLIC parlay)
 
 # target_link_libraries(cpam_range_qeury)
 if(JEMA)
