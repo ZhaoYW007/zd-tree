@@ -1,3 +1,4 @@
+#pragma once
 #include "parlay/internal/get_time.h"
 
 template<class F, class G, class H>
