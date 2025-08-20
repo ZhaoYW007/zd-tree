@@ -192,11 +192,13 @@ int main(int argc, char *argv[]) {
 
     if(test_type == 1) {
         printf("------------- Insert ------------\n");
-        parlay::sequence<vtx2> vec_to_search_2d(test_batch_size);
-        parlay::sequence<vtx3> vec_to_search_3d(test_batch_size);
+        parlay::sequence<vtx2> vec_to_search_2d;
+        parlay::sequence<vtx3> vec_to_search_3d;
         for(int i = 0, offset = total_insert_size; i < test_round; i++, offset += test_batch_size) {
             printf("Round: %d; Time: ", i);
             if(file_name == "uniform") {
+                if(NR_DIMENSION == 2) vec_to_search_2d.resize(test_batch_size);
+                else if(NR_DIMENSION == 3) vec_to_search_3d.resize(test_batch_size);
                 parlay::parallel_for(0, test_batch_size, [&](size_t j) {
                     if(NR_DIMENSION == 2) {
                         vec_to_search_2d[j].pt.x = abs(rn_gen::parallel_rand());
@@ -263,12 +265,18 @@ int main(int argc, char *argv[]) {
     else if(test_type == 2 || test_type == 3) {
         printf("------------- Box ------------\n");
         double box_edge_size = COORD_MAX / pow(total_insert_size / expected_box_size, 1.0 / NR_DIMENSION) / 2.0;
-        parlay::sequence<box> boxes(test_batch_size);
+        parlay::sequence<box_2d> boxes_2d;
+        parlay::sequence<box_3d> boxes_3d;
         for(int i = 0, offset = total_insert_size; i < test_round; i++, offset += test_batch_size) {
             printf("Round: %d; Time: ", i);
             if(file_name == "uniform") {
+                if(NR_DIMENSION == 2) boxes_2d.resize(test_batch_size);
+                else if(NR_DIMENSION == 3) boxes_3d.resize(test_batch_size);
                 parlay::parallel_for(0, test_batch_size, [&](size_t j) {
                     boxes[j].first.pnt[0] = abs(rn_gen::parallel_rand());
+                    if(NR_DIMENSION == 2) {
+
+                    }
                     boxes[j].first.pnt[1] = abs(rn_gen::parallel_rand());
                     boxes[j].first.pnt[2] = abs(rn_gen::parallel_rand());
                     boxes[j].second.pnt[0] = boxes[j].first.pnt[0] + box_edge_size * 2;
