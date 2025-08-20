@@ -177,6 +177,7 @@ int main(int argc, char *argv[]) {
     parlay::sequence<vtx3*> v_input_3d(1, NULL);
     knn_tree_2d T_2d(v_input_2d);
     knn_tree_3d T_3d(v_input_3d);
+    printf("Tree struct init\n");
     if(NR_DIMENSION == 2) {
         v_input_2d = parlay::tabulate(vectors_to_insert_2d.size(), [&](size_t i) { return &vectors_to_insert_2d[i]; });
         box_2d whole_box = knn_tree_2d::o_tree::get_box(v_input_2d);
@@ -184,7 +185,9 @@ int main(int argc, char *argv[]) {
     }
     else if(NR_DIMENSION == 3) {
         v_input_3d = parlay::tabulate(vectors_to_insert_3d.size(), [&](size_t i) { return &vectors_to_insert_3d[i]; });
+        printf("3D vtx=pt init\n");
         box_3d whole_box = knn_tree_3d::o_tree::get_box(v_input_3d);
+        printf("Get box\n");
         knn_tree_3d T_3d = knn_tree_3d(v_input_3d, whole_box);
     }
     printf("------------- Finish Tree Build ------------\n");
