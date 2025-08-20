@@ -51,7 +51,7 @@
 using namespace benchIO;
 using namespace std;
 
-#define MAX_KNN_WRAPPER (10)
+#define MAX_KNN_WRAPPER (100)
 
 // *************************************************************
 //  SOME DEFINITIONS
