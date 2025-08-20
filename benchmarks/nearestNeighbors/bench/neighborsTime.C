@@ -49,6 +49,8 @@
 using namespace benchIO;
 using namespace std;
 
+#define MAX_KNN_WRAPPER (1)
+
 // *************************************************************
 //  SOME DEFINITIONS
 // *************************************************************
@@ -101,8 +103,8 @@ int main(int argc, char *argv[]) {
 
     printf("------------- Data Structure Init ------------\n");
 
-    using vtx2 = vertex<point2, 1>;
-    using vtx3 = vertex<point3, 1>;
+    using vtx2 = vertex<point2, MAX_KNN_WRAPPER>;
+    using vtx3 = vertex<point3, MAX_KNN_WRAPPER>;
 
     parlay::sequence<point2> vectors_from_file_2d(1);
     parlay::sequence<vtx2> vectors_to_insert_2d(1);
@@ -162,8 +164,8 @@ int main(int argc, char *argv[]) {
     }
     printf("------------- Finish Data Init ------------\n");
 
-    using knn_tree_2d = k_nearest_neighbors<vtx2, 100>;
-    using knn_tree_3d = k_nearest_neighbors<vtx3, 100>;
+    using knn_tree_2d = k_nearest_neighbors<vtx2, MAX_KNN_WRAPPER>;
+    using knn_tree_3d = k_nearest_neighbors<vtx3, MAX_KNN_WRAPPER>;
     using box_2d = knn_tree_2d::box;
     using box_3d = knn_tree_3d::box;
     using node_2d = knn_tree_2d::node;
