@@ -45,7 +45,7 @@
 #define USE_PAPI (1)
 
 #ifdef USE_PAPI
-#include "utils/papi.h"
+#include "parlay/papi/papi_util_impl.h"
 #endif
 
 using namespace benchIO;
@@ -237,8 +237,8 @@ int main(int argc, char *argv[]) {
 #ifdef USE_PAPI
             papi_reset_counters();
             papi_turn_counters(true);
-            papi_check_counters(0);
-            // papi_wait_counters(true, parlay::num_workers());
+            papi_check_counters(parlay::worker_id());
+            papi_wait_counters(true, parlay::num_workers());
 #endif
             start_time = std::chrono::high_resolution_clock::now();
             if(NR_DIMENSION == 2) {
@@ -255,8 +255,8 @@ int main(int argc, char *argv[]) {
             }
 #ifdef USE_PAPI
             papi_turn_counters(false);
-            papi_check_counters(0);
-            // papi_wait_counters(false, parlay::num_workers());
+            papi_check_counters(parlay::worker_id());
+            papi_wait_counters(false, parlay::num_workers());
 #endif
             end_time = std::chrono::high_resolution_clock::now();
             auto d = std::chrono::duration_cast<std::chrono::duration<double>>(end_time - start_time);
@@ -309,8 +309,8 @@ int main(int argc, char *argv[]) {
 #ifdef USE_PAPI
             papi_reset_counters();
             papi_turn_counters(true);
-            papi_check_counters(0);
-            // papi_wait_counters(true, parlay::num_workers());
+            papi_check_counters(parlay::worker_id());
+            papi_wait_counters(true, parlay::num_workers());
 #endif
             start_time = std::chrono::high_resolution_clock::now();
             if(NR_DIMENSION == 2) {
@@ -337,8 +337,8 @@ int main(int argc, char *argv[]) {
             }
 #ifdef USE_PAPI
             papi_turn_counters(false);
-            papi_check_counters(0);
-            // papi_wait_counters(false, parlay::num_workers());
+            papi_check_counters(parlay::worker_id());
+            papi_wait_counters(false, parlay::num_workers());
 #endif
             end_time = std::chrono::high_resolution_clock::now();
             auto d = std::chrono::duration_cast<std::chrono::duration<double>>(end_time - start_time);
@@ -384,8 +384,8 @@ int main(int argc, char *argv[]) {
 #ifdef USE_PAPI
             papi_reset_counters();
             papi_turn_counters(true);
-            papi_check_counters(0);
-            // papi_wait_counters(true, parlay::num_workers());
+            papi_check_counters(parlay::worker_id());
+            papi_wait_counters(true, parlay::num_workers());
 #endif
             start_time = std::chrono::high_resolution_clock::now();
             if(NR_DIMENSION == 2) {
@@ -404,8 +404,8 @@ int main(int argc, char *argv[]) {
             }
 #ifdef USE_PAPI
             papi_turn_counters(false);
-            papi_check_counters(0);
-            // papi_wait_counters(false, parlay::num_workers());
+            papi_check_counters(parlay::worker_id());
+            papi_wait_counters(false, parlay::num_workers());
 #endif
             end_time = std::chrono::high_resolution_clock::now();
             auto d = std::chrono::duration_cast<std::chrono::duration<double>>(end_time - start_time);
