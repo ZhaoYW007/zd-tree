@@ -346,32 +346,39 @@ int main(int argc, char *argv[]) {
     }
     else if(test_type == 4) {
         printf("------------- kNN ------------\n");
-        parlay::sequence<vectorT> vec_to_search(test_batch_size);
+        parlay::sequence<vtx2> vec_to_search_2d;
+        parlay::sequence<vtx3> vec_to_search_3d;
         for(int i = 0, offset = total_insert_size; i < test_round; i++, offset += test_batch_size) {
             printf("Round: %d; Time: ", i);
             if(file_name == "uniform") {
+                if(NR_DIMENSION == 2) vec_to_search_2d.resize(test_batch_size);
+                else if(NR_DIMENSION == 3) vec_to_search_3d.resize(test_batch_size);
                 parlay::parallel_for(0, test_batch_size, [&](size_t j) {
-                    vec_to_search[j].pnt[0] = abs(rn_gen::parallel_rand());
-                    vec_to_search[j].pnt[1] = abs(rn_gen::parallel_rand());
-                    vec_to_search[j].pnt[2] = abs(rn_gen::parallel_rand());
+                    if(NR_DIMENSION == 2) {
+                        vec_to_search_2d[j].pt.x = abs(rn_gen::parallel_rand());
+                        vec_to_search_2d[j].pt.y = abs(rn_gen::parallel_rand());
+                        vec_to_search_2d[j].identifier = j;
+                    }
+                    else if(NR_DIMENSION == 3) {
+                        vec_to_search_3d[j].pt.x = abs(rn_gen::parallel_rand());
+                        vec_to_search_3d[j].pt.y = abs(rn_gen::parallel_rand());
+                        vec_to_search_3d[j].pt.z = abs(rn_gen::parallel_rand());
+                        vec_to_search_3d[j].identifier = j;
+                    }
                 });
             }
             else {
-                vec_to_search = parlay::tabulate(test_batch_size, [&](size_t j) {
-                    return vectors_from_file[offset + j];
-                });
+                if(NR_DIMENSION == 2) {
+                    vec_to_search_2d = parlay::tabulate(test_batch_size, [&](size_t j) {
+                        return vtx2(vectors_from_file_2d[offset + j], j);
+                    });
+                }
+                else if(NR_DIMENSION == 3) {
+                    vec_to_search_3d = parlay::tabulate(test_batch_size, [&](size_t j) {
+                        return vtx3(vectors_from_file_3d[offset + j], j);
+                    });
+                }
             }
-            node* KDParallelRoot = pkd.get_root();
-            auto bx = pkd.get_root_box();
-
-            points wp = points::uninitialized(test_batch_size);
-            parlay::copy(vec_to_search, wp);
-            parlay::sequence<nn_pair> Out(expected_box_size * test_batch_size, nn_pair(std::ref(wp[0]), 0));
-            parlay::sequence<kBoundedQueue<point, nn_pair>> bq =
-                parlay::sequence<kBoundedQueue<point, nn_pair>>::uninitialized(test_batch_size);
-            parlay::parallel_for(0, test_batch_size, [&](size_t i) {
-                bq[i].resize(Out.cut(i * expected_box_size, i * expected_box_size + expected_box_size));
-            });
 #ifdef USE_PAPI
             papi_reset_counters();
             papi_turn_counters(true);
@@ -379,10 +386,27 @@ int main(int argc, char *argv[]) {
             papi_wait_counters(true, parlay::num_workers());
 #endif
             start_time = std::chrono::high_resolution_clock::now();
-            parlay::parallel_for(0, test_batch_size, [&](size_t j) {
-                size_t visNodeNum = 0;
-                pkd.k_nearest(KDParallelRoot, vec_to_search[j], NR_DIMENSION, bq[j], bx, visNodeNum);
-            });
+            if(NR_DIMENSION == 2) {
+                node_2d *root = T_2d.get_root();
+                box_delta_2d bd = T_2d.get_box_delta(2);
+                parlay::parallel_for(0, test_batch_size, [&](size_t j) {
+                    T_2d.k_nearest(&vec_to_search_2d[j], expected_box_size);
+                });
+            }
+            else if(NR_DIMENSION == 3) {
+                node_3d *root = T_3d.get_root();
+                box_delta_3d bd = T_3d.get_box_delta(3);
+                parlay::parallel_for(0, test_batch_size, [&](size_t j) {
+                    T_3d.k_nearest(&vec_to_search_3d[j], expected_box_size);
+                });
+            }
+            end_time = std::chrono::high_resolution_clock::now();
+#ifdef USE_PAPI
+            papi_turn_counters(false);
+            papi_check_counters(parlay::worker_id());
+            papi_wait_counters(false, parlay::num_workers());
+#endif
+            auto d = std::chrono::duration_cast<std::chrono::
             end_time = std::chrono::high_resolution_clock::now();
 #ifdef USE_PAPI
             papi_turn_counters(false);
