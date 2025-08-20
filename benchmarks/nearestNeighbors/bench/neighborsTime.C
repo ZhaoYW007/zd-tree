@@ -240,7 +240,7 @@ int main(int argc, char *argv[]) {
             }
             else if(NR_DIMENSION == 3) {
                 node_3d *root = T_3d.get_root();
-                box_delta_3d bd = T_3d.get_box_delta(2);
+                box_delta_3d bd = T_3d.get_box_delta(3);
                 auto v_insert_3d = parlay::tabulate(test_batch_size, [&](size_t j) { return &vec_to_search_3d[j]; });
                 T_3d.batch_insert(vec_to_search_3d, root, bd.first, bd.second);
             }
@@ -273,24 +273,35 @@ int main(int argc, char *argv[]) {
                 if(NR_DIMENSION == 2) boxes_2d.resize(test_batch_size);
                 else if(NR_DIMENSION == 3) boxes_3d.resize(test_batch_size);
                 parlay::parallel_for(0, test_batch_size, [&](size_t j) {
-                    boxes[j].first.pnt[0] = abs(rn_gen::parallel_rand());
                     if(NR_DIMENSION == 2) {
-
+                        boxes_2d[j].first.x = abs(rn_gen::parallel_rand());
+                        boxes_2d[j].first.y = abs(rn_gen::parallel_rand());
+                        boxes_2d[j].second.x = boxes_2d[j].first.x + box_edge_size * 2;
+                        boxes_2d[j].second.y = boxes_2d[j].first.y + box_edge_size * 2;
                     }
-                    boxes[j].first.pnt[1] = abs(rn_gen::parallel_rand());
-                    boxes[j].first.pnt[2] = abs(rn_gen::parallel_rand());
-                    boxes[j].second.pnt[0] = boxes[j].first.pnt[0] + box_edge_size * 2;
-                    boxes[j].second.pnt[1] = boxes[j].first.pnt[1] + box_edge_size * 2;
-                    boxes[j].second.pnt[2] = boxes[j].first.pnt[2] + box_edge_size * 2;
+                    else if(NR_DIMENSION == 3) {
+                        boxes_3d[j].first.x = abs(rn_gen::parallel_rand());
+                        boxes_3d[j].first.y = abs(rn_gen::parallel_rand());
+                        boxes_3d[j].first.z = abs(rn_gen::parallel_rand());
+                        boxes_3d[j].second.x = boxes_3d[j].first.x + box_edge_size * 2;
+                        boxes_3d[j].second.y = boxes_3d[j].first.y + box_edge_size * 2;
+                        boxes_3d[j].second.z = boxes_3d[j].first.z + box_edge_size * 2;
+                    }
                 });
             }
             else {
-                boxes = parlay::tabulate(test_batch_size, [&](size_t j) {
-                    vectorT max_edge = vectors_from_file[offset + j];
-                    max_edge.pnt[0] += box_edge_size * 2;
-                    max_edge.pnt[1] += box_edge_size * 2;
-                    max_edge.pnt[2] += box_edge_size * 2;
-                    return std::make_pair(vectors_from_file[offset + j], max_edge);
+                if(NR_DIMENSION == 2) boxes_2d = parlay::tabulate(test_batch_size, [&](size_t j) {
+                    point2d pnt = vectors_from_file_2d[offset + j];
+                    pnt.x += box_edge_size * 2;
+                    pnt.y += box_edge_size * 2;
+                    return std::make_pair(vectors_from_file_2d[offset + j], pnt);
+                });
+                else if(NR_DIMENSION == 3) boxes_3d = parlay::tabulate(test_batch_size, [&](size_t j) {
+                    point3d pnt = vectors_from_file_3d[offset + j];
+                    pnt.x += box_edge_size * 2;
+                    pnt.y += box_edge_size * 2;
+                    pnt.z += box_edge_size * 2;
+                    return std::make_pair(vectors_from_file_3d[offset + j], pnt);
                 });
             }
 #ifdef USE_PAPI
@@ -300,14 +311,28 @@ int main(int argc, char *argv[]) {
             papi_wait_counters(true, parlay::num_workers());
 #endif
             start_time = std::chrono::high_resolution_clock::now();
-            parlay::parallel_for(0, test_batch_size, [&](size_t j) {
-                size_t visLeafNum, visInterNum;
-                size_t cnt = pkd.range_count(boxes[j], visLeafNum, visInterNum);
-                if(test_type == 3) {
-                    parlay::sequence<vectorT> res(cnt);
-                    pkd.range_query_serial(boxes[j], res);
+            if(NR_DIMENSION == 2) {
+                node_2d *root = T_2d.get_root();
+                box_delta_2d bd = T_2d.get_box_delta(2);
+                for(size_t j = 0; j < test_batch_size; j++) {
+                    T.range_count(root, boxes_2d[j], bd.second);
+                    if(test_type == 3) {
+                        parlay::sequence<vtx2*> out(root->get_aug(), nullptr);
+                        T.range_query(root, parlay::make_slice(out), boxes_2d[j], bd.second);
+                    }
                 }
-            });
+            }
+            else if(NR_DIMENSION == 3) {
+                node_3d *root = T_3d.get_root();
+                box_delta_3d bd = T_3d.get_box_delta(3);
+                for(size_t j = 0; j < test_batch_size; j++) {
+                    T.range_count(root, boxes_3d[j], bd.second);
+                    if(test_type == 3) {
+                        parlay::sequence<vtx3*> out(root->get_aug(), nullptr);
+                        T.range_query(root, parlay::make_slice(out), boxes_3d[j], bd.second);
+                    }
+                }
+            }
             end_time = std::chrono::high_resolution_clock::now();
 #ifdef USE_PAPI
             papi_turn_counters(false);
