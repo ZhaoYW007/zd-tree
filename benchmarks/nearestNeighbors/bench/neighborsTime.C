@@ -42,6 +42,8 @@
 #include "utils/random_generator.h"
 #include "testFramework.h"
 
+#define USE_PAPI (1)
+
 #ifdef USE_PAPI
 #include "utils/papi.h"
 #endif
