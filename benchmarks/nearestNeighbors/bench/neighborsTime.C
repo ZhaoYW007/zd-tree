@@ -245,7 +245,6 @@ int main(int argc, char *argv[]) {
                 auto v_insert_3d = parlay::tabulate(test_batch_size, [&](size_t j) { return &vec_to_search_3d[j]; });
                 T_3d.batch_insert(v_insert_3d, root, bd.first, bd.second);
             }
-            end_time = std::chrono::high_resolution_clock::now();
 #ifdef USE_PAPI
             papi_turn_counters(false);
             papi_check_counters(parlay::worker_id());
@@ -401,7 +400,6 @@ int main(int argc, char *argv[]) {
                     T_3d.k_nearest(&vec_to_search_3d[j], expected_box_size);
                 });
             }
-            end_time = std::chrono::high_resolution_clock::now();
 #ifdef USE_PAPI
             papi_turn_counters(false);
             papi_check_counters(parlay::worker_id());
