@@ -75,6 +75,7 @@ struct vertex {
 
 /* Argv for main function */
 int64_t total_insert_size;
+int64_t insert_round;
 int NR_DIMENSION;
 int test_batch_size;
 int test_round;
@@ -86,10 +87,11 @@ void host_parse_arguments(int argc, char *argv[]) {
     file_name          = (argc >= 2  ?      argv[1]    : "uniform");
     NR_DIMENSION       = (argc >= 3  ? stoi(argv[2] )  : 3       );
     total_insert_size  = (argc >= 4  ? stoi(argv[3] )  : 500000  );
-    test_type          = (argc >= 5  ? stoi(argv[4] )  : 0       );
-    test_batch_size    = (argc >= 6  ? stoi(argv[5] )  : 10000   );
-    test_round         = (argc >= 7  ? stoi(argv[6] )  : 2       );
-    expected_box_size  = (argc >= 8  ? stoi(argv[7] )  : 100     );
+    insert_round       = (argc >= 5  ? stoi(argv[4] )  : 1       );
+    test_type          = (argc >= 6  ? stoi(argv[5] )  : 0       );
+    test_batch_size    = (argc >= 7  ? stoi(argv[6] )  : 10000   );
+    test_round         = (argc >= 8  ? stoi(argv[7] )  : 2       );
+    expected_box_size  = (argc >= 9  ? stoi(argv[8] )  : 100     );
 }
 
 /**
@@ -115,57 +117,6 @@ int main(int argc, char *argv[]) {
     size_t varden_counter = 0;
     coord COORD_MAX = INT64_MAX;
 
-    if(file_name == "uniform") {
-        printf("Uniform\n");
-        if(NR_DIMENSION == 2) {
-            vectors_to_insert_2d.resize(total_insert_size);
-            parlay::parallel_for(0, total_insert_size, [&](size_t i) {
-                vectors_to_insert_2d[i].pt.x = abs(rn_gen::parallel_rand());
-                vectors_to_insert_2d[i].pt.y = abs(rn_gen::parallel_rand());
-                vectors_to_insert_2d[i].identifier = i;
-            });
-        }
-        else if(NR_DIMENSION == 3) {
-            vectors_to_insert_3d.resize(total_insert_size);
-            parlay::parallel_for(0, total_insert_size, [&](size_t i) {
-                vectors_to_insert_3d[i].pt.x = abs(rn_gen::parallel_rand());
-                vectors_to_insert_3d[i].pt.y = abs(rn_gen::parallel_rand());
-                vectors_to_insert_3d[i].pt.z = abs(rn_gen::parallel_rand());
-                vectors_to_insert_3d[i].identifier = i;
-            });
-        }
-    }
-    else {
-        printf("File: %s\n", file_name.c_str());
-        if(NR_DIMENSION == 2) {
-            read_points_2d(file_name.c_str(), vectors_from_file_2d, 100);
-            vectors_to_insert_2d = parlay::tabulate(total_insert_size, [&](size_t i) {
-                return vtx2(vectors_from_file_2d[i], i);
-            });
-            if(test_type == 2 || test_type == 3) {
-                COORD_MAX = parlay::reduce(parlay::delayed_tabulate(vectors_from_file_2d.size(), [&](size_t j) {
-                    return std::max(vectors_from_file_2d[j].x, vectors_from_file_2d[j].y);
-                }), parlay::maximum<coord>()) - parlay::reduce(parlay::delayed_tabulate(vectors_from_file_2d.size(), [&](size_t j) {
-                    return std::min(vectors_from_file_2d[j].x, vectors_from_file_2d[j].y);
-                }), parlay::minimum<coord>());
-            }
-        }
-        else if(NR_DIMENSION == 3) {
-            read_points_3d(file_name.c_str(), vectors_from_file_3d, 100);
-            vectors_to_insert_3d = parlay::tabulate(total_insert_size, [&](size_t i) {
-                return vtx3(vectors_from_file_3d[i], i);
-            });
-            if(test_type == 2 || test_type == 3) {
-                COORD_MAX = parlay::reduce(parlay::delayed_tabulate(vectors_from_file_3d.size(), [&](size_t j) {
-                    return std::max(vectors_from_file_3d[j].x, std::max(vectors_from_file_3d[j].y, vectors_from_file_3d[j].z));
-                }), parlay::maximum<coord>()) - parlay::reduce(parlay::delayed_tabulate(vectors_from_file_3d.size(), [&](size_t j) {
-                    return std::min(vectors_from_file_3d[j].x, std::min(vectors_from_file_3d[j].y, vectors_from_file_3d[j].z));
-                }), parlay::minimum<coord>());
-            }
-        }
-    }
-    printf("------------- Finish Data Init ------------\n");
-
     using knn_tree_2d = k_nearest_neighbors<vtx2, MAX_KNN_WRAPPER>;
     using knn_tree_3d = k_nearest_neighbors<vtx3, MAX_KNN_WRAPPER>;
     using box_2d = knn_tree_2d::box;
@@ -180,18 +131,95 @@ int main(int argc, char *argv[]) {
     parlay::sequence<vtx3*> v_input_3d(1, &null_vtx_3d);
     knn_tree_2d T_2d(v_input_2d);
     knn_tree_3d T_3d(v_input_3d);
-    printf("Tree struct init\n");
-    if(NR_DIMENSION == 2) {
-        v_input_2d = parlay::tabulate(vectors_to_insert_2d.size(), [&](size_t i) { return &vectors_to_insert_2d[i]; });
-        box_2d whole_box = knn_tree_2d::o_tree::get_box(v_input_2d);
-        T_2d = knn_tree_2d(v_input_2d, whole_box);
+
+    if(file_name != "uniform") {
+        printf("File: %s\n", file_name.c_str());
+            if(NR_DIMENSION == 2) {
+                read_points_2d(file_name.c_str(), vectors_from_file_2d, 100);
+                if(test_type == 2 || test_type == 3) {
+                    COORD_MAX = parlay::reduce(parlay::delayed_tabulate(vectors_from_file_2d.size(), [&](size_t j) {
+                        return std::max(vectors_from_file_2d[j].x, vectors_from_file_2d[j].y);
+                    }), parlay::maximum<coord>()) - parlay::reduce(parlay::delayed_tabulate(vectors_from_file_2d.size(), [&](size_t j) {
+                        return std::min(vectors_from_file_2d[j].x, vectors_from_file_2d[j].y);
+                    }), parlay::minimum<coord>());
+                }
+            }
+            else if(NR_DIMENSION == 3) {
+                read_points_3d(file_name.c_str(), vectors_from_file_3d, 100);
+                if(test_type == 2 || test_type == 3) {
+                    COORD_MAX = parlay::reduce(parlay::delayed_tabulate(vectors_from_file_3d.size(), [&](size_t j) {
+                        return std::max(vectors_from_file_3d[j].x, std::max(vectors_from_file_3d[j].y, vectors_from_file_3d[j].z));
+                    }), parlay::maximum<coord>()) - parlay::reduce(parlay::delayed_tabulate(vectors_from_file_3d.size(), [&](size_t j) {
+                        return std::min(vectors_from_file_3d[j].x, std::min(vectors_from_file_3d[j].y, vectors_from_file_3d[j].z));
+                    }), parlay::minimum<coord>());
+                }
+            }
     }
-    else if(NR_DIMENSION == 3) {
-        v_input_3d = parlay::tabulate(vectors_to_insert_3d.size(), [&](size_t i) { return &vectors_to_insert_3d[i]; });
-        printf("3D vtx=pt init\n");
-        box_3d whole_box = knn_tree_3d::o_tree::get_box(v_input_3d);
-        printf("Get box\n");
-        T_3d = knn_tree_3d(v_input_3d, whole_box);
+
+    for(int r = 0; r < insert_round; r++) {
+        if(file_name == "uniform") {
+            printf("Uniform\n");
+            if(NR_DIMENSION == 2) {
+                vectors_to_insert_2d.resize(total_insert_size / insert_round);
+                parlay::parallel_for(0, total_insert_size / insert_round, [&](size_t i) {
+                    vectors_to_insert_2d[i].pt.x = abs(rn_gen::parallel_rand());
+                    vectors_to_insert_2d[i].pt.y = abs(rn_gen::parallel_rand());
+                    vectors_to_insert_2d[i].identifier = i + r * (total_insert_size / insert_round);
+                });
+            }
+            else if(NR_DIMENSION == 3) {
+                vectors_to_insert_3d.resize(total_insert_size / insert_round);
+                parlay::parallel_for(0, total_insert_size / insert_round, [&](size_t i) {
+                    vectors_to_insert_3d[i].pt.x = abs(rn_gen::parallel_rand());
+                    vectors_to_insert_3d[i].pt.y = abs(rn_gen::parallel_rand());
+                    vectors_to_insert_3d[i].pt.z = abs(rn_gen::parallel_rand());
+                    vectors_to_insert_3d[i].identifier = i + r * (total_insert_size / insert_round);
+                });
+            }
+        }
+        else {
+            printf("File: %s\n", file_name.c_str());
+            if(NR_DIMENSION == 2) {
+                vectors_to_insert_2d = parlay::tabulate(total_insert_size / insert_round, [&](size_t i) {
+                    return vtx2(
+                        vectors_from_file_2d[i + r * (total_insert_size / insert_round)],
+                        i + r * (total_insert_size / insert_round
+                    ));
+                });
+            }
+            else if(NR_DIMENSION == 3) {
+                vectors_to_insert_3d = parlay::tabulate(total_insert_size / insert_round, [&](size_t i) {
+                    return vtx3(
+                        vectors_from_file_3d[i + r * (total_insert_size / insert_round)],
+                        i + r * (total_insert_size / insert_round)
+                    );
+                });
+            }
+        }
+        if(NR_DIMENSION == 2) {
+            v_input_2d = parlay::tabulate(vectors_to_insert_2d.size(), [&](size_t i) { return &vectors_to_insert_2d[i]; });
+            if(r == 0) {
+                box_2d whole_box = knn_tree_2d::o_tree::get_box(v_input_2d);
+                T_2d = knn_tree_2d(v_input_2d, whole_box);
+            }
+            else {
+                node_2d *root = T_2d.tree.get();
+                box_delta_2d bd = T_2d.get_box_delta(2);
+                T_2d.batch_insert(v_input_2d, root, bd.first, bd.second);
+            }
+        }
+        else if(NR_DIMENSION == 3) {
+            v_input_3d = parlay::tabulate(vectors_to_insert_3d.size(), [&](size_t i) { return &vectors_to_insert_3d[i]; });
+            if(r == 0) {
+                box_3d whole_box = knn_tree_3d::o_tree::get_box(v_input_3d);
+                T_3d = knn_tree_3d(v_input_3d, whole_box);
+            }
+            else {
+                node_3d *root = T_3d.tree.get();
+                box_delta_3d bd = T_3d.get_box_delta(3);
+                T_3d.batch_insert(v_input_3d, root, bd.first, bd.second);
+            }
+        }
     }
     printf("------------- Finish Tree Build ------------\n");
 
