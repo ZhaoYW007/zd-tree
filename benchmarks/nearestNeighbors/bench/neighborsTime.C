@@ -100,10 +100,13 @@ int main(int argc, char *argv[]) {
 
     printf("------------- Data Structure Init ------------\n");
 
+    using vtx2 = vertex<point2, 100>;
+    using vtx3 = vertex<point3, 100>;
+
     parlay::sequence<point2> vectors_from_file_2d(1);
-    parlay::sequence<point2> vectors_to_insert_2d(1);
+    parlay::sequence<vtx2> vectors_to_insert_2d(1);
     parlay::sequence<point3> vectors_from_file_3d(1);
-    parlay::sequence<point3> vectors_to_insert_3d(1);
+    parlay::sequence<vtx3> vectors_to_insert_3d(1);
     size_t varden_counter = 0;
     coord COORD_MAX = INT64_MAX;
 
@@ -111,17 +114,19 @@ int main(int argc, char *argv[]) {
         printf("Uniform\n");
         if(NR_DIMENSION == 2) {
             vectors_to_insert_2d.resize(total_insert_size);
-            parlay::parallel_for(0, vectors_to_insert_2d.size(), [&](size_t i) {
-                vectors_to_insert_2d[i].x = abs(rn_gen::parallel_rand());
-                vectors_to_insert_2d[i].y = abs(rn_gen::parallel_rand());
+            parlay::parallel_for(0, total_insert_size, [&](size_t i) {
+                vectors_to_insert_2d[i].pt.x = abs(rn_gen::parallel_rand());
+                vectors_to_insert_2d[i].pt.y = abs(rn_gen::parallel_rand());
+                vectors_to_insert_2d[i].identifier = i;
             });
         }
         else if(NR_DIMENSION == 3) {
             vectors_to_insert_3d.resize(total_insert_size);
-            parlay::parallel_for(0, vectors_to_insert_3d.size(), [&](size_t i) {
-                vectors_to_insert_3d[i].x = abs(rn_gen::parallel_rand());
-                vectors_to_insert_3d[i].y = abs(rn_gen::parallel_rand());
-                vectors_to_insert_3d[i].z = abs(rn_gen::parallel_rand());
+            parlay::parallel_for(0, total_insert_size, [&](size_t i) {
+                vectors_to_insert_3d[i].pt.x = abs(rn_gen::parallel_rand());
+                vectors_to_insert_3d[i].pt.y = abs(rn_gen::parallel_rand());
+                vectors_to_insert_3d[i].pt.z = abs(rn_gen::parallel_rand());
+                vectors_to_insert_3d[i].identifier = i;
             });
         }
     }
@@ -129,7 +134,9 @@ int main(int argc, char *argv[]) {
         printf("File: %s\n", file_name.c_str());
         if(NR_DIMENSION == 2) {
             read_points_2d(file_name.c_str(), vectors_from_file_2d, 100);
-            vectors_to_insert_2d = parlay::tabulate(total_insert_size, [&](size_t i) { return vectors_from_file_2d[i]; });
+            vectors_to_insert_2d = parlay::tabulate(total_insert_size, [&](size_t i) {
+                return vtx2(vectors_from_file_2d[i], i);
+            });
             if(test_type == 2 || test_type == 3) {
                 COORD_MAX = parlay::reduce(parlay::delayed_tabulate(vectors_from_file_2d.size(), [&](size_t j) {
                     return std::max(vectors_from_file_2d[j].x, vectors_from_file_2d[j].y);
@@ -140,7 +147,9 @@ int main(int argc, char *argv[]) {
         }
         else if(NR_DIMENSION == 3) {
             read_points_3d(file_name.c_str(), vectors_from_file_3d, 100);
-            vectors_to_insert_3d = parlay::tabulate(total_insert_size, [&](size_t i) { return vectors_from_file_3d[i]; });
+            vectors_to_insert_3d = parlay::tabulate(total_insert_size, [&](size_t i) {
+                return vtx3(vectors_from_file_3d[i], i);
+            });
             if(test_type == 2 || test_type == 3) {
                 COORD_MAX = parlay::reduce(parlay::delayed_tabulate(vectors_from_file_3d.size(), [&](size_t j) {
                     return std::max(vectors_from_file_3d[j].x, std::max(vectors_from_file_3d[j].y, vectors_from_file_3d[j].z));
@@ -152,7 +161,29 @@ int main(int argc, char *argv[]) {
     }
     printf("------------- Finish Data Init ------------\n");
 
-    // todo: build tree
+    using knn_tree_2d = k_nearest_neighbors<vtx2, 100>;
+    using knn_tree_3d = k_nearest_neighbors<vtx3, 100>;
+    using box_2d = knn_tree_2d::box;
+    using box_3d = knn_tree_3d::box;
+    using node_2d = knn_tree_2d::node;
+    using node_3d = knn_tree_3d::node;
+    using box_delta_2d = std::pair<box_2d, double>;
+    using box_delta_3d = std::pair<box_3d, double>;
+
+    parlay::sequence<vtx2*> v_input_2d(1, NULL);
+    parlay::sequence<vtx3*> v_input_3d(1, NULL);
+    knn_tree_2d T_2d(v_input_2d);
+    knn_tree_3d T_3d(v_input_3d);
+    if(NR_DIMENSION == 2) {
+        v_input_2d = parlay::tabulate(vectors_to_insert_2d.size(), [&](size_t i) { return &vectors_to_insert_2d[i]; });
+        box_2d whole_box = knn_tree_2d::o_tree::get_box(v_input_2d);
+        knn_tree_2d T_2d = knn_tree_2d(v_input_2d, whole_box);
+    }
+    else if(NR_DIMENSION == 3) {
+        v_input_3d = parlay::tabulate(vectors_to_insert_3d.size(), [&](size_t i) { return &vectors_to_insert_3d[i]; });
+        box_3d whole_box = knn_tree_3d::o_tree::get_box(v_input_3d);
+        knn_tree_3d T_3d = knn_tree_3d(v_input_3d, whole_box);
+    }
     printf("------------- Finish Tree Build ------------\n");
 
 #ifdef USE_PAPI
@@ -161,20 +192,36 @@ int main(int argc, char *argv[]) {
 
     if(test_type == 1) {
         printf("------------- Insert ------------\n");
-        parlay::sequence<vectorT> vec_to_search(test_batch_size);
+        parlay::sequence<vtx2> vec_to_search_2d(test_batch_size);
+        parlay::sequence<vtx3> vec_to_search_3d(test_batch_size);
         for(int i = 0, offset = total_insert_size; i < test_round; i++, offset += test_batch_size) {
             printf("Round: %d; Time: ", i);
             if(file_name == "uniform") {
                 parlay::parallel_for(0, test_batch_size, [&](size_t j) {
-                    vec_to_search[j].pnt[0] = abs(rn_gen::parallel_rand());
-                    vec_to_search[j].pnt[1] = abs(rn_gen::parallel_rand());
-                    vec_to_search[j].pnt[2] = abs(rn_gen::parallel_rand());
+                    if(NR_DIMENSION == 2) {
+                        vec_to_search_2d[j].pt.x = abs(rn_gen::parallel_rand());
+                        vec_to_search_2d[j].pt.y = abs(rn_gen::parallel_rand());
+                        vec_to_search_2d[j].identifier = j;
+                    }
+                    else if(NR_DIMENSION == 3) {
+                        vec_to_search_3d[j].pt.x = abs(rn_gen::parallel_rand());
+                        vec_to_search_3d[j].pt.y = abs(rn_gen::parallel_rand());
+                        vec_to_search_3d[j].pt.z = abs(rn_gen::parallel_rand());
+                        vec_to_search_3d[j].identifier = j;
+                    }
                 });
             }
             else {
-                vec_to_search = parlay::tabulate(test_batch_size, [&](size_t j) {
-                    return vectors_from_file[offset + j];
-                });
+                if(NR_DIMENSION == 2) {
+                    vec_to_search_2d = parlay::tabulate(test_batch_size, [&](size_t j) {
+                        return vtx2(vectors_from_file_2d[offset + j], j);
+                    });
+                }
+                else if(NR_DIMENSION == 3) {
+                    vec_to_search_3d = parlay::tabulate(test_batch_size, [&](size_t j) {
+                        return vtx3(vectors_from_file_3d[offset + j], j);
+                    });
+                }
             }
 #ifdef USE_PAPI
             papi_reset_counters();
@@ -183,7 +230,25 @@ int main(int argc, char *argv[]) {
             papi_wait_counters(true, parlay::num_workers());
 #endif
             start_time = std::chrono::high_resolution_clock::now();
-            pkd.batchInsert(parlay::make_slice(vec_to_search), NR_DIMENSION);
+            if(NR_DIMENSION == 2) {
+                node_2d *root = T_2d.get_root();
+                box_delta_2d bd = T_2d.get_box_delta(2);
+                auto v_insert_2d = parlay::tabulate(test_batch_size, [&](size_t j) { return &vec_to_search_2d[j]; });
+                T_2d.batch_insert(vec_to_search_2d, root, bd.first, bd.second);
+            }
+            else if(NR_DIMENSION == 3) {
+                node_3d *root = T_3d.get_root();
+                box_delta_3d bd = T_3d.get_box_delta(2);
+                auto v_insert_3d = parlay::tabulate(test_batch_size, [&](size_t j) { return &vec_to_search_3d[j]; });
+                T_3d.batch_insert(vec_to_search_3d, root, bd.first, bd.second);
+            }
+            end_time = std::chrono::high_resolution_clock::now();
+#ifdef USE_PAPI
+            papi_turn_counters(false);
+            papi_check_counters(parlay::worker_id());
+            papi_wait_counters(false, parlay::num_workers());
+#endif
+            auto d = std::chrono::duration_cast<std::chrono::
             end_time = std::chrono::high_resolution_clock::now();
 #ifdef USE_PAPI
             papi_turn_counters(false);
