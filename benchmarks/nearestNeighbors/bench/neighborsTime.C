@@ -234,13 +234,13 @@ int main(int argc, char *argv[]) {
 #endif
             start_time = std::chrono::high_resolution_clock::now();
             if(NR_DIMENSION == 2) {
-                node_2d *root = T_2d.get_root();
+                node_2d *root = T_2d.get();
                 box_delta_2d bd = T_2d.get_box_delta(2);
                 auto v_insert_2d = parlay::tabulate(test_batch_size, [&](size_t j) { return &vec_to_search_2d[j]; });
                 T_2d.batch_insert(vec_to_search_2d, root, bd.first, bd.second);
             }
             else if(NR_DIMENSION == 3) {
-                node_3d *root = T_3d.get_root();
+                node_3d *root = T_3d.get();
                 box_delta_3d bd = T_3d.get_box_delta(3);
                 auto v_insert_3d = parlay::tabulate(test_batch_size, [&](size_t j) { return &vec_to_search_3d[j]; });
                 T_3d.batch_insert(vec_to_search_3d, root, bd.first, bd.second);
@@ -313,7 +313,7 @@ int main(int argc, char *argv[]) {
 #endif
             start_time = std::chrono::high_resolution_clock::now();
             if(NR_DIMENSION == 2) {
-                node_2d *root = T_2d.get_root();
+                node_2d *root = T_2d.get();
                 box_delta_2d bd = T_2d.get_box_delta(2);
                 for(size_t j = 0; j < test_batch_size; j++) {
                     T.range_count(root, boxes_2d[j], bd.second);
@@ -324,7 +324,7 @@ int main(int argc, char *argv[]) {
                 }
             }
             else if(NR_DIMENSION == 3) {
-                node_3d *root = T_3d.get_root();
+                node_3d *root = T_3d.get();
                 box_delta_3d bd = T_3d.get_box_delta(3);
                 for(size_t j = 0; j < test_batch_size; j++) {
                     T.range_count(root, boxes_3d[j], bd.second);
@@ -388,14 +388,14 @@ int main(int argc, char *argv[]) {
 #endif
             start_time = std::chrono::high_resolution_clock::now();
             if(NR_DIMENSION == 2) {
-                node_2d *root = T_2d.get_root();
+                node_2d *root = T_2d.get();
                 box_delta_2d bd = T_2d.get_box_delta(2);
                 parlay::parallel_for(0, test_batch_size, [&](size_t j) {
                     T_2d.k_nearest(&vec_to_search_2d[j], expected_box_size);
                 });
             }
             else if(NR_DIMENSION == 3) {
-                node_3d *root = T_3d.get_root();
+                node_3d *root = T_3d.get();
                 box_delta_3d bd = T_3d.get_box_delta(3);
                 parlay::parallel_for(0, test_batch_size, [&](size_t j) {
                     T_3d.k_nearest(&vec_to_search_3d[j], expected_box_size);
