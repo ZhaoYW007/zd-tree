@@ -63,7 +63,8 @@ struct vertex {
     int identifier;
     pointT pt;        // the point itself
     vertex *ngh[KK];  // the list of neighbors
-    vertex(pointT p, int id) : pt(p), identifier(id) {}
+    vertex(pointT p, int id = 0) : pt(p), identifier(id) {}
+    vertex(int id = 0) : identifier(id) {}
     size_t counter;
     size_t counter2;
 };
@@ -100,8 +101,8 @@ int main(int argc, char *argv[]) {
 
     printf("------------- Data Structure Init ------------\n");
 
-    using vtx2 = vertex<point2, 100>;
-    using vtx3 = vertex<point3, 100>;
+    using vtx2 = vertex<point2, 1>;
+    using vtx3 = vertex<point3, 1>;
 
     parlay::sequence<point2> vectors_from_file_2d(1);
     parlay::sequence<vtx2> vectors_to_insert_2d(1);
