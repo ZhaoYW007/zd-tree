@@ -237,13 +237,13 @@ int main(int argc, char *argv[]) {
                 node_2d *root = T_2d.tree.get();
                 box_delta_2d bd = T_2d.get_box_delta(2);
                 auto v_insert_2d = parlay::tabulate(test_batch_size, [&](size_t j) { return &vec_to_search_2d[j]; });
-                T_2d.batch_insert(vec_to_search_2d, root, bd.first, bd.second);
+                T_2d.batch_insert(v_insert_2d, root, bd.first, bd.second);
             }
             else if(NR_DIMENSION == 3) {
                 node_3d *root = T_3d.tree.get();
                 box_delta_3d bd = T_3d.get_box_delta(3);
                 auto v_insert_3d = parlay::tabulate(test_batch_size, [&](size_t j) { return &vec_to_search_3d[j]; });
-                T_3d.batch_insert(vec_to_search_3d, root, bd.first, bd.second);
+                T_3d.batch_insert(v_insert_3d, root, bd.first, bd.second);
             }
             end_time = std::chrono::high_resolution_clock::now();
 #ifdef USE_PAPI
@@ -316,10 +316,10 @@ int main(int argc, char *argv[]) {
                 node_2d *root = T_2d.tree.get();
                 box_delta_2d bd = T_2d.get_box_delta(2);
                 for(size_t j = 0; j < test_batch_size; j++) {
-                    T.range_count(root, boxes_2d[j], bd.second);
+                    T_2d.range_count(root, boxes_2d[j], bd.second);
                     if(test_type == 3) {
                         parlay::sequence<vtx2*> out(root->get_aug(), nullptr);
-                        T.range_query(root, parlay::make_slice(out), boxes_2d[j], bd.second);
+                        T_2d.range_query(root, parlay::make_slice(out), boxes_2d[j], bd.second);
                     }
                 }
             }
@@ -327,10 +327,10 @@ int main(int argc, char *argv[]) {
                 node_3d *root = T_3d.tree.get();
                 box_delta_3d bd = T_3d.get_box_delta(3);
                 for(size_t j = 0; j < test_batch_size; j++) {
-                    T.range_count(root, boxes_3d[j], bd.second);
+                    T_3d.range_count(root, boxes_3d[j], bd.second);
                     if(test_type == 3) {
                         parlay::sequence<vtx3*> out(root->get_aug(), nullptr);
-                        T.range_query(root, parlay::make_slice(out), boxes_3d[j], bd.second);
+                        T_3d.range_query(root, parlay::make_slice(out), boxes_3d[j], bd.second);
                     }
                 }
             }
