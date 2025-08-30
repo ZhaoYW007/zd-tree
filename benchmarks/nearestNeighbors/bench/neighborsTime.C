@@ -132,30 +132,6 @@ int main(int argc, char *argv[]) {
     knn_tree_2d T_2d(v_input_2d);
     knn_tree_3d T_3d(v_input_3d);
 
-    if(file_name != "uniform") {
-        printf("File: %s\n", file_name.c_str());
-            if(NR_DIMENSION == 2) {
-                read_points_2d(file_name.c_str(), vectors_from_file_2d, 100);
-                if(test_type == 2 || test_type == 3) {
-                    COORD_MAX = parlay::reduce(parlay::delayed_tabulate(vectors_from_file_2d.size(), [&](size_t j) {
-                        return std::max(vectors_from_file_2d[j].x, vectors_from_file_2d[j].y);
-                    }), parlay::maximum<coord>()) - parlay::reduce(parlay::delayed_tabulate(vectors_from_file_2d.size(), [&](size_t j) {
-                        return std::min(vectors_from_file_2d[j].x, vectors_from_file_2d[j].y);
-                    }), parlay::minimum<coord>());
-                }
-            }
-            else if(NR_DIMENSION == 3) {
-                read_points_3d(file_name.c_str(), vectors_from_file_3d, 100);
-                if(test_type == 2 || test_type == 3) {
-                    COORD_MAX = parlay::reduce(parlay::delayed_tabulate(vectors_from_file_3d.size(), [&](size_t j) {
-                        return std::max(vectors_from_file_3d[j].x, std::max(vectors_from_file_3d[j].y, vectors_from_file_3d[j].z));
-                    }), parlay::maximum<coord>()) - parlay::reduce(parlay::delayed_tabulate(vectors_from_file_3d.size(), [&](size_t j) {
-                        return std::min(vectors_from_file_3d[j].x, std::min(vectors_from_file_3d[j].y, vectors_from_file_3d[j].z));
-                    }), parlay::minimum<coord>());
-                }
-            }
-    }
-
     for(int r = 0; r < insert_round; r++) {
         if(file_name == "uniform") {
             printf("Uniform\n");
